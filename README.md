@@ -62,26 +62,27 @@ work on models not listed here once a matching profile is added.
 
 ## Installation
 
-This integration is installed as a Home Assistant **custom component**. The folder
-name must be `optoma_link` (matching the integration domain).
+### HACS (recommended)
 
-### Manual / git
+This repository is a [HACS](https://hacs.xyz/) custom repository.
 
-```bash
-cd /config/custom_components        # your Home Assistant config dir
-git clone https://github.com/nerdaxic/optoma_link.git optoma_link
-```
+1. In HACS, open the ⋮ menu (top right) → **Custom repositories**.
+2. **Repository:** `https://github.com/nerdaxic/optoma_link`, **Type:**
+   `Integration` → **Add**.
+3. Find **Optoma Link** in HACS, open it, and choose **Download**.
+4. **Restart Home Assistant.**
 
-Then restart Home Assistant. To update later, `git pull` inside that folder and
-restart again.
+### Manual
 
-> **HACS:** this repository currently ships the integration at its root for direct
-> cloning, so it is not yet a one-click HACS custom repository. If you'd like HACS
-> support, open an issue — it only requires moving the files under
-> `custom_components/optoma_link/`.
+1. Download this repository (green **Code** button → **Download ZIP**, or
+   `git clone`).
+2. Copy the `custom_components/optoma_link` folder into your Home Assistant
+   `config/custom_components/` directory (create `custom_components/` if it
+   doesn't exist).
+3. **Restart Home Assistant.**
 
-After restarting, go to **Settings → Devices & Services → Add Integration** and
-search for **Optoma Link**.
+Either way, after restarting go to **Settings → Devices & Services → Add
+Integration** and search for **Optoma Link**.
 
 ## Configuration
 
