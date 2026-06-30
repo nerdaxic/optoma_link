@@ -1,0 +1,179 @@
+{
+  "schema_version": 1,
+  "model_id": "w501",
+  "manufacturer": "Optoma",
+  "display_name": "Optoma W501 / EH501 / X501",
+  "aliases": ["W501", "EW501", "EH501", "X501"],
+  "verified": false,
+  "source": "Optoma 'RS232 Commands and Protocol Function List' (EN-81..86) shared across the W501/EW501/EH501/X501 projector family. Transcribed from the official PDF; not yet verified against real hardware. Please open a pull request with corrections if you own one of these models.",
+  "detect": {
+    "read_code": "151",
+    "read_sub": "1",
+    "value_type": "index",
+    "index_map": { "1": "X501", "2": "W501", "3": "EH501" }
+  },
+  "serial_read": null,
+  "capabilities": {
+    "three_d": true,
+    "wol": false
+  },
+  "switches": [
+    {
+      "key": "power",
+      "name": "Power",
+      "icon": "mdi:projector",
+      "on": ["00", "1"],
+      "off": ["00", "0"],
+      "read": ["124", "1"]
+    },
+    {
+      "key": "av_mute",
+      "name": "AV Mute",
+      "icon": "mdi:eye-off",
+      "on": ["02", "1"],
+      "off": ["02", "0"],
+      "read": null
+    },
+    {
+      "key": "audio_mute",
+      "name": "Audio Mute",
+      "icon": "mdi:volume-mute",
+      "on": ["03", "1"],
+      "off": ["03", "0"],
+      "read": null
+    }
+  ],
+  "selects": [
+    {
+      "key": "input_source",
+      "name": "Input Source",
+      "icon": "mdi:video-input-hdmi",
+      "write_code": "12",
+      "options": {
+        "HDMI": "1", "DVI-I": "3", "VGA1": "5", "VGA2": "6",
+        "VGA1 Component": "8", "S-Video": "9", "Video": "10",
+        "VGA2 Component": "13", "Flash drive": "17",
+        "Network Display": "18", "USB display": "19"
+      },
+      "read": ["121", "1"],
+      "read_options": {
+        "0": "None", "1": "VGA1", "2": "VGA2", "3": "Video", "4": "S-Video",
+        "5": "HDMI", "6": "DVI-I", "7": "Flash drive",
+        "8": "Network Display", "9": "USB display"
+      }
+    },
+    {
+      "key": "picture_mode",
+      "name": "Picture Mode",
+      "icon": "mdi:palette",
+      "write_code": "20",
+      "options": {
+        "Presentation": "1", "Bright": "2", "Movie": "3", "sRGB": "4",
+        "User": "5", "Blackboard": "7", "DICOM SIM.": "13", "3D": "9"
+      },
+      "read": ["123", "1"],
+      "read_options": {
+        "0": "None", "1": "Presentation", "2": "Bright", "3": "Movie",
+        "4": "sRGB", "5": "User", "6": "Blackboard", "7": "DICOM SIM.",
+        "8": "3D"
+      }
+    },
+    {
+      "key": "aspect_ratio",
+      "name": "Aspect Ratio",
+      "icon": "mdi:aspect-ratio",
+      "write_code": "60",
+      "options": {
+        "4:3": "1", "16:9": "2", "16:10": "3", "LBX": "5", "Native": "6",
+        "Auto": "7"
+      },
+      "read": ["127", "1"],
+      "read_options": {
+        "0": "4:3", "1": "16:9", "2": "16:10", "3": "LBX", "4": "Native",
+        "5": "Auto"
+      }
+    },
+    {
+      "key": "lamp_mode",
+      "name": "Lamp Brightness Mode",
+      "icon": "mdi:brightness-percent",
+      "write_code": "110",
+      "options": { "Bright": "1", "Eco+": "3", "Dynamic": "4" },
+      "read": null
+    },
+    {
+      "key": "three_d_mode",
+      "name": "3D Sync Mode",
+      "icon": "mdi:rotate-3d-variant",
+      "write_code": "230",
+      "options": { "DLP-Link": "1", "IR": "2" },
+      "read": null
+    },
+    {
+      "key": "three_d_format",
+      "name": "3D Format",
+      "icon": "mdi:video-3d",
+      "write_code": "405",
+      "options": {
+        "Auto": "0", "Side-by-Side (SBS)": "1", "Top and Bottom": "2",
+        "Frame Sequential": "3"
+      },
+      "read": null
+    }
+  ],
+  "numbers": [
+    {
+      "key": "brightness",
+      "name": "Brightness",
+      "icon": "mdi:brightness-6",
+      "write_code": "21",
+      "min": -50, "max": 50, "step": 1,
+      "read": ["125", "1"]
+    },
+    {
+      "key": "contrast",
+      "name": "Contrast",
+      "icon": "mdi:contrast-box",
+      "write_code": "22",
+      "min": -50, "max": 50, "step": 1,
+      "read": ["126", "1"]
+    },
+    {
+      "key": "sharpness",
+      "name": "Sharpness",
+      "icon": "mdi:image-filter-vintage",
+      "write_code": "23",
+      "min": 1, "max": 15, "step": 1,
+      "read": null
+    }
+  ],
+  "binary_sensors": [],
+  "sensors": [
+    {
+      "key": "lamp_hours",
+      "name": "Lamp Hours",
+      "icon": "mdi:clock-outline",
+      "read": ["108", "1"],
+      "value_type": "int",
+      "unit": "h",
+      "state_class": "total_increasing"
+    },
+    {
+      "key": "firmware_version",
+      "name": "Firmware Version",
+      "icon": "mdi:chip",
+      "read": ["122", "1"],
+      "value_type": "str",
+      "entity_category": "diagnostic"
+    }
+  ],
+  "buttons": [
+    {
+      "key": "resync",
+      "name": "Resync",
+      "icon": "mdi:sync",
+      "command": ["01", "1"],
+      "entity_category": "config"
+    }
+  ]
+}

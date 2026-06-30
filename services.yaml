@@ -1,0 +1,55 @@
+send_command:
+  name: Send raw RS232 command
+  description: >-
+    Send a raw RS232 command code to the projector and return its reply.
+    Use this for anything not already exposed as an entity -- see the full
+    command reference table in the integration's README. Example: code
+    "20", value "21" sets Display Mode to HDR.
+  fields:
+    code:
+      name: Command code
+      description: >-
+        The numeric command code from Optoma's RS232 table, e.g. "00" for
+        power, "20" for Display Mode, "405" for 3D Format.
+      required: true
+      example: "20"
+      selector:
+        text:
+    value:
+      name: Value
+      description: The value to send after the code (omit for value-less commands).
+      required: false
+      example: "21"
+      selector:
+        text:
+    entry_id:
+      name: Device
+      description: >-
+        Config entry ID to target if you have more than one projector
+        configured. Defaults to the only/first configured projector.
+      required: false
+      selector:
+        text:
+
+set_test_pattern:
+  name: Show or hide test pattern
+  description: >-
+    Toggles the projector's built-in test pattern (a grid by default), if
+    its profile defines one. Handy for checking focus/alignment without
+    grabbing the remote.
+  fields:
+    enabled:
+      name: Enabled
+      description: True to show the test pattern, false to hide it.
+      required: true
+      example: true
+      selector:
+        boolean:
+    entry_id:
+      name: Device
+      description: >-
+        Config entry ID to target if you have more than one projector
+        configured. Defaults to the only/first configured projector.
+      required: false
+      selector:
+        text:

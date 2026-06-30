@@ -1,0 +1,222 @@
+{
+  "schema_version": 1,
+  "model_id": "uhz68lv",
+  "manufacturer": "Optoma",
+  "display_name": "Optoma UHZ68LV",
+  "aliases": ["UHZ68LV"],
+  "verified": true,
+  "source": "Optoma official RS232 Command Table for the UHZ68LV (RS232.xlsx, rev. 1 / 2024-10-15), supplied by the integration's original author.",
+  "detect": {
+    "read_code": "151",
+    "read_sub": "1",
+    "value_type": "string"
+  },
+  "serial_read": ["353", "1"],
+  "capabilities": {
+    "three_d": true,
+    "wol": true
+  },
+  "test_pattern": {
+    "write_code": "195",
+    "on": "1",
+    "off": "0"
+  },
+  "switches": [
+    {
+      "key": "power",
+      "name": "Power",
+      "icon": "mdi:projector",
+      "on": ["00", "1"],
+      "off": ["00", "0"],
+      "read": ["124", "1"]
+    },
+    {
+      "key": "av_mute",
+      "name": "AV Mute",
+      "icon": "mdi:eye-off",
+      "on": ["02", "1"],
+      "off": ["02", "0"],
+      "read": ["355", "1"]
+    },
+    {
+      "key": "audio_mute",
+      "name": "Audio Mute",
+      "icon": "mdi:volume-mute",
+      "on": ["03", "1"],
+      "off": ["03", "0"],
+      "read": ["356", "1"]
+    }
+  ],
+  "selects": [
+    {
+      "key": "input_source",
+      "name": "Input Source",
+      "icon": "mdi:video-input-hdmi",
+      "write_code": "12",
+      "options": { "HDMI1": "1", "HDMI2": "15", "HDMI3": "16" },
+      "read": ["121", "1"],
+      "read_options": {
+        "0": "None", "1": "DVI", "2": "VGA-1", "3": "VGA-2", "4": "S-Video",
+        "5": "Video", "6": "BNC", "7": "HDMI1", "8": "HDMI2", "9": "HDMI3",
+        "10": "Wireless", "11": "Component", "12": "Flash drive",
+        "13": "Network Display", "14": "USB Display", "15": "DisplayPort",
+        "16": "HDBaseT", "17": "Home", "18": "3G-SDI", "19": "Sport",
+        "20": "Smart TV"
+      }
+    },
+    {
+      "key": "picture_mode",
+      "name": "Picture Mode",
+      "icon": "mdi:palette",
+      "write_code": "20",
+      "options": {
+        "Bright": "2", "Cinema": "3", "Reference": "4", "AI-PQ": "41",
+        "3D": "9", "Dolby Vision Bright": "49", "Dolby Vision Dark": "50",
+        "Game": "12", "WCG": "42", "ISF Day": "14", "ISF Night": "15",
+        "ISF 3D": "17", "Vivid": "16", "2D High Speed": "18",
+        "Blending": "19", "Sport": "20", "HDR": "21", "HDR10+": "43",
+        "HLG": "25", "ISF Day HDR": "47", "ISF Night HDR": "48"
+      },
+      "read": ["123", "1"],
+      "read_options": {
+        "0": "None", "1": "Presentation", "2": "Bright", "3": "Cinema",
+        "4": "Reference", "5": "User", "6": "User2 / 3D User",
+        "7": "Blackboard", "8": "Classroom", "9": "3D", "10": "DICOM SIM.",
+        "11": "Film", "12": "Game", "14": "Vivid", "15": "ISF Day",
+        "16": "ISF Night", "17": "ISF 3D", "18": "2D High Speed",
+        "19": "Blending", "20": "Sport", "21": "HDR", "25": "HLG",
+        "41": "AI-PQ", "42": "WCG", "44": "Golf Sim.", "45": "HDR10+",
+        "48": "Dolby Vision Bright", "49": "Dolby Vision Dark"
+      }
+    },
+    {
+      "key": "aspect_ratio",
+      "name": "Aspect Ratio",
+      "icon": "mdi:aspect-ratio",
+      "write_code": "60",
+      "options": {
+        "4:3": "1", "16:9": "2", "Window": "4", "Native": "6", "Auto": "7",
+        "Full": "19", "V-Stretch": "20", "21:9": "16", "32:9": "18",
+        "2.35:1": "17"
+      },
+      "read": ["127", "1"],
+      "read_options": {
+        "0": "None", "1": "4:3", "2": "16:9", "3": "16:10",
+        "6": "Native", "7": "Auto", "8": "Auto235", "9": "Superwide",
+        "10": "4:3-II", "16": "21:9", "17": "32:9", "19": "Full",
+        "20": "V-Stretch"
+      }
+    },
+    {
+      "key": "three_d_mode",
+      "name": "3D Sync Mode",
+      "icon": "mdi:rotate-3d-variant",
+      "write_code": "230",
+      "options": { "Off": "0", "DLP-Link": "1", "VESA 3D / IR": "3", "On": "4" },
+      "read": null
+    },
+    {
+      "key": "three_d_format",
+      "name": "3D Format",
+      "icon": "mdi:video-3d",
+      "write_code": "405",
+      "options": {
+        "Auto": "0", "Side-by-Side (SBS)": "1", "Top and Bottom": "2",
+        "Frame Sequential": "3", "Frame Packing": "7", "Off": "8",
+        "Field Sequential": "9"
+      },
+      "read": null
+    },
+    {
+      "key": "light_source_power",
+      "name": "Light Source Power",
+      "icon": "mdi:brightness-percent",
+      "write_code": "326",
+      "options": {
+        "100%": "0", "95%": "1", "90%": "2", "85%": "3", "80%": "4",
+        "75%": "5", "70%": "6", "65%": "7", "60%": "8", "55%": "9", "50%": "10"
+      },
+      "read": null
+    }
+  ],
+  "numbers": [
+    {
+      "key": "brightness",
+      "name": "Brightness",
+      "icon": "mdi:brightness-6",
+      "write_code": "21",
+      "min": -50, "max": 50, "step": 1,
+      "read": ["125", "1"]
+    },
+    {
+      "key": "contrast",
+      "name": "Contrast",
+      "icon": "mdi:contrast-box",
+      "write_code": "22",
+      "min": -50, "max": 50, "step": 1,
+      "read": ["126", "1"]
+    },
+    {
+      "key": "sharpness",
+      "name": "Sharpness",
+      "icon": "mdi:image-filter-vintage",
+      "write_code": "23",
+      "min": 1, "max": 15, "step": 1,
+      "read": null
+    }
+  ],
+  "binary_sensors": [
+    {
+      "key": "three_d_active",
+      "name": "3D Active",
+      "icon": "mdi:video-3d",
+      "read": ["130", "1"]
+    }
+  ],
+  "sensors": [
+    {
+      "key": "lamp_hours",
+      "name": "Light Source Hours",
+      "icon": "mdi:clock-outline",
+      "read": ["108", "1"],
+      "value_type": "int",
+      "unit": "h",
+      "state_class": "total_increasing"
+    },
+    {
+      "key": "system_temperature",
+      "name": "System Temperature",
+      "icon": "mdi:thermometer",
+      "read": ["352", "1"],
+      "value_type": "int",
+      "unit": "°C",
+      "device_class": "temperature",
+      "state_class": "measurement"
+    },
+    {
+      "key": "firmware_version",
+      "name": "Firmware Version",
+      "icon": "mdi:chip",
+      "read": ["122", "1"],
+      "value_type": "str",
+      "entity_category": "diagnostic"
+    },
+    {
+      "key": "serial_number",
+      "name": "Serial Number",
+      "icon": "mdi:barcode",
+      "read": ["353", "1"],
+      "value_type": "str",
+      "entity_category": "diagnostic"
+    }
+  ],
+  "buttons": [
+    {
+      "key": "resync",
+      "name": "Resync",
+      "icon": "mdi:sync",
+      "command": ["01", "1"],
+      "entity_category": "config"
+    }
+  ]
+}
