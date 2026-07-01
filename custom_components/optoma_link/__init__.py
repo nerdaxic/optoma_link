@@ -12,7 +12,7 @@ from datetime import timedelta
 
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_HOST, CONF_PORT, Platform
+from homeassistant.const import CONF_HOST, Platform
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv, device_registry as dr
@@ -23,14 +23,13 @@ from .const import (
     CONF_MODEL,
     CONF_PROJECTOR_ID,
     CONF_SCAN_INTERVAL,
-    CONF_SERIAL_PORT,
     CONNECTION_TYPE_SERIAL,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     MANUFACTURER,
 )
 from .coordinator import OptomaUpdateCoordinator
-from .profiles import get_profile
+from .profiles import async_load_profiles
 from .transport import OptomaCommandError, OptomaConnectionError, build_transport
 
 _LOGGER = logging.getLogger(__name__)
@@ -69,7 +68,8 @@ SET_TEST_PATTERN_SCHEMA = vol.Schema(
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up an Optoma Link projector from a config entry."""
-    profile = get_profile(entry.data[CONF_MODEL])
+    profiles = await async_load_profiles(hass)
+    profile = profiles.get(entry.data[CONF_MODEL])
     if profile is None:
         raise HomeAssistantError(
             f"Unknown projector profile '{entry.data[CONF_MODEL]}'. Was a profile removed "
@@ -90,10 +90,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
 
+    # The device registry only accepts http/https/homeassistant URLs
+    # (see _validate_device_info_fields in helpers/device_registry.py), so
+    # point at the projector's web admin page for LAN entries and omit the
+    # URL entirely for serial connections.
     if entry.data.get(CONF_CONNECTION_TYPE) == CONNECTION_TYPE_SERIAL:
-        configuration_url = f"serial://{entry.data[CONF_SERIAL_PORT]}"
+        configuration_url = None
     else:
-        configuration_url = f"telnet://{entry.data[CONF_HOST]}:{entry.data[CONF_PORT]}"
+        configuration_url = f"http://{entry.data[CONF_HOST]}"
 
     device_registry = dr.async_get(hass)
     device_registry.async_get_or_create(

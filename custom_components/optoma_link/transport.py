@@ -15,6 +15,7 @@ import asyncio
 import logging
 from abc import ABC, abstractmethod
 
+import serial_asyncio_fast
 from homeassistant.const import CONF_HOST, CONF_PORT
 
 from .const import (
@@ -97,7 +98,13 @@ class OptomaTransport(ABC):
         if with_password and self._password:
             cmd += f" ~{self._password}"
         cmd += TERMINATOR
-        return cmd.encode("ascii")
+        try:
+            return cmd.encode("ascii")
+        except UnicodeEncodeError as err:
+            raise OptomaCommandError(
+                f"Command '{code} {value or ''}' contains non-ASCII characters; "
+                "the RS232 protocol is ASCII-only"
+            ) from err
 
     async def async_send(
         self, code: str, value: str | None = None, *, expect_reply: bool = True
@@ -115,11 +122,25 @@ class OptomaTransport(ABC):
                     reply = await self._async_send_once(code, value, expect_reply=expect_reply)
                     return reply
                 except _RetryWithPassword:
-                    reply = await self._async_send_once(
-                        code, value, expect_reply=expect_reply, with_password=True
-                    )
+                    try:
+                        reply = await self._async_send_once(
+                            code, value, expect_reply=expect_reply, with_password=True
+                        )
+                    except (
+                        TimeoutError,
+                        asyncio.IncompleteReadError,
+                        asyncio.LimitOverrunError,
+                        OSError,
+                    ) as err:
+                        await self.async_disconnect()
+                        raise OptomaConnectionError(f"Lost connection: {err}") from err
                     return reply
-                except (TimeoutError, asyncio.IncompleteReadError, OSError) as err:
+                except (
+                    TimeoutError,
+                    asyncio.IncompleteReadError,
+                    asyncio.LimitOverrunError,
+                    OSError,
+                ) as err:
                     _LOGGER.debug(
                         "Command failed on attempt %s (%s); reconnecting", attempt, err
                     )
@@ -137,7 +158,12 @@ class OptomaTransport(ABC):
         with_password: bool = False,
     ) -> str:
         payload = self._build_command(code, value, with_password=with_password)
-        _LOGGER.debug("TX -> %s", payload)
+        log_payload = payload
+        if with_password and self._password:
+            log_payload = payload.replace(
+                f" ~{self._password}".encode("ascii"), b" ~<redacted>"
+            )
+        _LOGGER.debug("TX -> %s", log_payload)
         await self._async_write(payload)
 
         if not expect_reply:
@@ -223,8 +249,6 @@ class OptomaSerialTransport(OptomaTransport):
         return self._writer is not None and not self._writer.is_closing()
 
     async def _async_open(self) -> None:
-        import serial_asyncio_fast
-
         self._reader, self._writer = await asyncio.wait_for(
             serial_asyncio_fast.open_serial_connection(
                 url=self._device,

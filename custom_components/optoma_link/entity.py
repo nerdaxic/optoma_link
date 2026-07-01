@@ -51,5 +51,4 @@ class OptomaEntity(CoordinatorEntity[OptomaUpdateCoordinator]):
             name=entry.title,
             sw_version=coordinator.data.get("firmware_version") if coordinator.data else None,
             serial_number=coordinator.data.get("serial_number") if coordinator.data else None,
-            configuration_url=entry.data.get("configuration_url"),
         )

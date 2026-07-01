@@ -14,7 +14,10 @@ import json
 import logging
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -61,6 +64,18 @@ def load_profiles() -> dict[str, dict[str, Any]]:
         profiles[profile["model_id"]] = profile
 
     return profiles
+
+
+async def async_load_profiles(hass: HomeAssistant) -> dict[str, dict[str, Any]]:
+    """Event-loop-safe ``load_profiles()``.
+
+    The first call reads the profile JSON files in an executor thread;
+    once the ``lru_cache`` is primed, the synchronous helpers in this
+    module are free to call from the loop.
+    """
+    if load_profiles.cache_info().currsize:
+        return load_profiles()
+    return await hass.async_add_executor_job(load_profiles)
 
 
 def get_profile(model_id: str) -> dict[str, Any] | None:

@@ -48,7 +48,12 @@ from .const import (
     MIN_SCAN_INTERVAL,
     MODEL_NAME_READ,
 )
-from .profiles import describe_detected_model, guess_profile_id, load_profiles
+from .profiles import (
+    async_load_profiles,
+    describe_detected_model,
+    guess_profile_id,
+    load_profiles,
+)
 from .transport import (
     OptomaCommandError,
     OptomaConnectionError,
@@ -176,6 +181,7 @@ class OptomaConfigFlow(ConfigFlow, domain=DOMAIN):
                 }
                 self._transport = transport
                 self._raw_model_reply = raw_reply
+                await async_load_profiles(self.hass)
                 self._guessed_model_id = guess_profile_id(raw_reply)
                 return await self.async_step_confirm_model()
 
@@ -233,6 +239,7 @@ class OptomaConfigFlow(ConfigFlow, domain=DOMAIN):
                 }
                 self._transport = transport
                 self._raw_model_reply = raw_reply
+                await async_load_profiles(self.hass)
                 self._guessed_model_id = guess_profile_id(raw_reply)
                 return await self.async_step_confirm_model()
 
@@ -266,7 +273,7 @@ class OptomaConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def async_step_confirm_model(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         errors: dict[str, str] = {}
-        profiles = load_profiles()
+        profiles = await async_load_profiles(self.hass)
         default_model = self._guessed_model_id or next(iter(sorted(profiles)), None)
 
         if user_input is not None:
@@ -321,15 +328,21 @@ class OptomaConfigFlow(ConfigFlow, domain=DOMAIN):
             },
         )
 
-    async def async_step_show_test_pattern(self) -> FlowResult:
+    async def async_step_show_test_pattern(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
         await self._async_send_test_pattern(True)
         return await self.async_step_test_pattern()
 
-    async def async_step_hide_test_pattern(self) -> FlowResult:
+    async def async_step_hide_test_pattern(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
         await self._async_send_test_pattern(False)
         return await self.async_step_test_pattern()
 
-    async def async_step_finish_setup(self) -> FlowResult:
+    async def async_step_finish_setup(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
         await self._async_send_test_pattern(False)
         return await self._async_finish()
 

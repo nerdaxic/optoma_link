@@ -96,8 +96,12 @@ class OptomaUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             raw = _strip_ok(reply)
             data[key] = self._parse_value(entity_type, spec, raw)
 
-        if not any_success and last_error is not None:
-            raise UpdateFailed(str(last_error))
+        if not any_success:
+            if last_error is not None:
+                raise UpdateFailed(str(last_error))
+            # Connection is alive but the projector rejected every read
+            # (typical for some models in standby); keep the cached data.
+            _LOGGER.debug("Projector rejected every poll command; keeping cached state")
 
         return data
 
