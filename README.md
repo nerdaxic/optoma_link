@@ -1,81 +1,55 @@
 # Optoma Link
 
-[![License: AGPL v3](https://img.shields.io/badge/License-AGPLv3-blue.svg)](LICENSE)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPLv3-blue.svg)](https://github.com/nerdaxic/optoma_link/blob/main/LICENSE)
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
 [![GitHub release](https://img.shields.io/github/v/release/nerdaxic/optoma_link?include_prereleases)](https://github.com/nerdaxic/optoma_link/releases)
-[![GitHub issues](https://img.shields.io/github/issues/nerdaxic/optoma_link)](https://github.com/nerdaxic/optoma_link/issues)
 
-A profile-driven, transport-agnostic [Home Assistant](https://www.home-assistant.io/) custom integration for controlling Optoma projectors over their RS232 ASCII protocol.
+Control **Optoma projectors** from [Home Assistant](https://www.home-assistant.io/) over their RS232 ASCII protocol — either across the network (the projector's RJ-45 port, called **"RS232 by Telnet"** in Optoma's menus) or through a **direct RS232 serial cable** plugged into the machine running Home Assistant.
 
-It works either across the network (the projector's RJ-45 port, what Optoma calls "RS232 by Telnet") or over a direct RS232 serial cable plugged into the machine running Home Assistant.
-
-> **Status: alpha.** The architecture is in place and the bundled UHZ68LV profile is verified against real hardware, but most model profiles are transcribed from Optoma's documentation and have not yet been confirmed on a physical unit. Expect rough edges, and please [open an issue](https://github.com/nerdaxic/optoma_link/issues) if something misbehaves.
-
-## Contents
-
-- [Why "profile-driven"?](#why-profile-driven)
-- [Features](#features)
-- [Supported projectors](#supported-projectors)
-- [Requirements](#requirements)
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [Services](#services)
-- [Adding a projector profile](#adding-a-projector-profile)
-- [Versioning](#versioning)
-- [Disclaimer](#disclaimer)
-- [License](#license)
-- [Contributing](#contributing)
-
-## Why "profile-driven"?
-
-The integration code knows nothing about any specific projector model. Every entity it creates and every command it sends comes from a small JSON **profile** under [`projectors/`](custom_components/optoma_link/projectors/).
-
-A profile maps a model's logical entities (switches, selects, numbers, sensors, buttons) to its RS232 command codes. Adding support for a new Optoma projector is just a matter of adding a JSON file and opening a pull request, no Python required. See [Adding a projector profile](#adding-a-projector-profile) below.
+> **Status: alpha.** The bundled UHZ68LV profile is verified against real hardware. The other profiles are transcribed from Optoma's documentation and have not yet been confirmed on a physical unit. Expect rough edges, and please [open an issue](https://github.com/nerdaxic/optoma_link/issues) if something misbehaves.
 
 ## Features
 
 - Connect over **LAN** ("RS232 by Telnet") or a **direct serial cable**, with the same command set either way.
 - **Automatic model detection** during setup, with a dropdown to confirm or override.
-- Optional **test pattern** step during setup so you can visually confirm you're talking to the right unit.
-- Entities generated from the active profile: Power, AV/Audio Mute, Input Source, Picture Mode, Aspect Ratio, Brightness, Contrast, Sharpness, 3D controls, Light Source Power, Lamp/Light Source Hours, Temperature, Firmware Version, Serial Number, Resync, and more (the exact set depends on the model).
-- Optional **Wake-on-LAN**: some projectors stop answering power-on commands in deep standby. Supply the MAC address and the Power switch will send a magic packet first (also exposed as a standalone button).
-- Adjustable **poll interval** and an **RS232 password** field for units with serial security enabled.
-- Two services: [`send_command`](#services) (raw passthrough) and [`set_test_pattern`](#services).
+- Optional **test pattern** step during setup, so you can visually confirm you're talking to the right unit.
+- Entities generated from the active profile: Power, AV/Audio Mute, Input Source, Picture Mode, Aspect Ratio, Brightness, Contrast, Sharpness, 3D controls, Light Source Power, Lamp/Light Source Hours, Temperature, Firmware Version, Serial Number, Resync, and more. The exact set depends on the model.
+- Optional **Wake-on-LAN**: some projectors stop answering power-on commands in deep standby. Supply the MAC address and the Power switch sends a magic packet first (also exposed as a standalone button).
+- Adjustable **poll interval**, and an **RS232 password** field for units with serial security enabled.
+- Two services: `optoma_link.send_command` (raw passthrough) and `optoma_link.set_test_pattern`.
 
 ## Supported projectors
 
 | Model profile | `model_id` | Verified on hardware |
-| --- | --- | --- |
+|---|---|---|
 | Optoma UHZ68LV | `uhz68lv` | ✅ Yes |
-| Optoma W501 / EW501 / EH501 / X501 | `w501` | ⚠️ Documentation only |
-| Optoma ZU650 / ZU650T / ZU650T+ | `zu650` | ⚠️ Documentation only |
+| Optoma W501 / EW501 / EH501 / X501 | `w501` | ⚠️ From documentation only |
+| Optoma ZU650 / ZU650T / ZU650T+ | `zu650` | ⚠️ From documentation only |
 
-Because the protocol is shared across Optoma's range, the integration will often work on models not listed here once a matching profile is added.
+The integration itself is model-agnostic: every entity and command comes from a small JSON **profile** in [`projectors/`](https://github.com/nerdaxic/optoma_link/tree/main/custom_components/optoma_link/projectors). Because the protocol is shared across Optoma's range, the integration will often work on models not listed here once a matching profile is added — see *Adding a projector profile* below. No Python required.
 
 ## Requirements
 
-- Home Assistant, a recent release (this integration uses the modern config flow and `DataUpdateCoordinator` APIs).
-- For **serial** connections: `pyserial-asyncio-fast` and `pyserial`, declared in [`manifest.json`](custom_components/optoma_link/manifest.json) and installed by Home Assistant automatically.
+- A recent Home Assistant release (the integration uses the modern config-flow and `DataUpdateCoordinator` APIs).
 - The projector reachable on your network (LAN) or wired to the host (serial), with RS232 control enabled in its on-screen menu.
+- For **serial** connections, `pyserial-asyncio-fast` and `pyserial` are installed by Home Assistant automatically.
 
 ## Installation
 
 ### HACS (recommended)
 
-This repository is a [HACS](https://hacs.xyz/) custom repository.
-
-1. In HACS, open the ⋮ menu (top right), then **Custom repositories**.
-2. **Repository:** `https://github.com/nerdaxic/optoma_link`, **Type:** `Integration`, then **Add**.
-3. Find **Optoma Link** in HACS, open it, and choose **Download**.
+1. In HACS, open the **⋮** menu (top right) → **Custom repositories**.
+2. Add repository `https://github.com/nerdaxic/optoma_link` with type **Integration**.
+3. Find **Optoma Link** in HACS and choose **Download**.
 4. **Restart Home Assistant.**
 
 ### Manual
 
-1. Download this repository (green **Code** button, **Download ZIP**, or `git clone`).
+1. Download this repository (**Code → Download ZIP**, or `git clone`).
 2. Copy the `custom_components/optoma_link` folder into your Home Assistant `config/custom_components/` directory (create `custom_components/` if it doesn't exist).
 3. **Restart Home Assistant.**
 
-Either way, after restarting go to **Settings, Devices & Services, Add Integration** and search for **Optoma Link**.
+After restarting, go to **Settings → Devices & Services → Add Integration** and search for **Optoma Link**.
 
 ## Configuration
 
@@ -83,12 +57,12 @@ Setup runs entirely in the UI:
 
 1. **Choose a connection:** network ("RS232 by Telnet") or direct serial.
 2. **Enter connection details:**
-   - *LAN:* host/IP, port (default `23`), 2-digit projector ID (default `00`), and an optional RS232 password. If the projector can't be reached you'll get a hint pointing at **Network, LAN / Control** in its on-screen menu.
+   - *LAN:* host/IP, port (default `23`), 2-digit projector ID (default `00`), and an optional RS232 password. If the projector can't be reached, you'll get a hint pointing at **Network → LAN / Control** in its on-screen menu.
    - *Serial:* pick (or type) the serial port, baud rate (default `9600`, the Optoma standard), projector ID, and optional password.
 3. **Confirm the model:** the integration tries to auto-detect it. Confirm or pick from the dropdown, give the device a name, and optionally enter a MAC address to enable Wake-on-LAN.
-4. **Test pattern** *(if the model supports it)*: toggle the projector's built-in test grid on/off to confirm you're connected to the right unit, then finish.
+4. **Test pattern** *(if the model supports it)*: toggle the projector's built-in test grid on and off to confirm you're connected to the right unit, then finish.
 
-The **poll interval** can be changed later from the integration's options (default 30 seconds, range 5 to 300 seconds).
+The **poll interval** can be changed later from the integration's options (default 30 seconds, range 5–300 seconds).
 
 ## Services
 
@@ -97,7 +71,7 @@ The **poll interval** can be changed later from the integration's options (defau
 Send a raw RS232 command and get the projector's reply back. Use this for anything not exposed as an entity; consult your projector's Optoma RS232 command table.
 
 | Field | Required | Example | Description |
-| --- | --- | --- | --- |
+|---|---|---|---|
 | `code` | yes | `"20"` | Numeric command code from Optoma's RS232 table. |
 | `value` | no | `"21"` | Value sent after the code (omit for value-less commands). |
 | `entry_id` | no | | Target a specific projector if you have more than one. |
@@ -107,18 +81,18 @@ Send a raw RS232 command and get the projector's reply back. Use this for anythi
 Show or hide the projector's built-in test pattern (if its profile defines one).
 
 | Field | Required | Example | Description |
-| --- | --- | --- | --- |
+|---|---|---|---|
 | `enabled` | yes | `true` | `true` shows the pattern, `false` hides it. |
 | `entry_id` | no | | Target a specific projector if you have more than one. |
 
 ## Adding a projector profile
 
-A profile is a JSON file in [`projectors/`](custom_components/optoma_link/projectors/). It maps a model's logical entities to RS232 command codes. The integration sends commands as `~{projector_id}{code} {value}\r` and expects `P` (pass) or `F` (fail) for writes, or `Ok{value}` for reads.
+A profile is a JSON file in [`projectors/`](https://github.com/nerdaxic/optoma_link/tree/main/custom_components/optoma_link/projectors). It maps a model's logical entities to RS232 command codes. The integration sends commands as `~{projector_id}{code} {value}` followed by a carriage return, and expects `P` (pass) or `F` (fail) for writes, or `Ok{value}` for reads.
 
 ### Top-level keys
 
 | Key | Required | Notes |
-| --- | --- | --- |
+|---|---|---|
 | `schema_version` | yes | Currently `1`. |
 | `model_id` | yes | Unique slug, e.g. `"uhz68lv"`. Used as the profile key. |
 | `display_name` | yes | Human-readable, e.g. `"Optoma UHZ68LV"`. |
@@ -142,11 +116,11 @@ Every entity has a `key` (unique within the profile), a `name`, and an optional 
 - **sensor**: `read`, optional `value_type` (`"str"`, `"int"`, or `"float"`), `unit`, `device_class` (`"temperature"`), `state_class` (`"measurement"` or `"total_increasing"`), `entity_category` (`"diagnostic"`).
 - **button**: `command` as `[code, value]`, optional `entity_category`.
 
-The three bundled profiles in [`projectors/`](custom_components/optoma_link/projectors/) are worth reading as worked examples. PRs that add or correct profiles are very welcome, especially marking one `verified` after testing on real hardware.
+The three bundled profiles are worth reading as worked examples. Pull requests that add or correct profiles are very welcome — especially marking one `verified` after testing on real hardware.
 
 ## Versioning
 
-This project follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`). The version in [`manifest.json`](custom_components/optoma_link/manifest.json) always matches the latest [GitHub release](https://github.com/nerdaxic/optoma_link/releases). HACS uses these releases to offer updates, so install from HACS (or watch the repository) to get notified of new versions.
+This project follows [Semantic Versioning](https://semver.org/). The version in `manifest.json` always matches the latest [GitHub release](https://github.com/nerdaxic/optoma_link/releases), which HACS uses to offer updates.
 
 ## Disclaimer
 
@@ -156,7 +130,7 @@ This is an unofficial, community-built integration. It is not affiliated with, e
 
 Copyright © 2026 nerdaxic.
 
-Optoma Link is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**. See [LICENSE](LICENSE) for the full text. You are free to use, study, modify, and share it, including commercially, provided that any distributed or network-deployed derivative work is also released under the AGPL-3.0 with complete corresponding source, and that attribution is preserved.
+Optoma Link is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**. See [LICENSE](https://github.com/nerdaxic/optoma_link/blob/main/LICENSE) for the full text. You are free to use, study, modify, and share it, including commercially, provided that any distributed or network-deployed derivative work is also released under the AGPL-3.0 with complete corresponding source, and that attribution is preserved.
 
 ### Commercial / proprietary licensing
 
