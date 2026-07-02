@@ -91,6 +91,26 @@ class OptomaTransport(ABC):
         except OSError:
             pass
 
+    async def _async_drain_stale_input(self) -> None:
+        """Discard any complete lines already sitting in the receive buffer.
+
+        The projector pushes unsolicited ``INFOn`` status lines on power
+        transitions, and a reply that arrives after we stopped waiting for it
+        stays buffered. Either would otherwise be consumed as the answer to
+        the *next* command, shifting every reply after it by one (firmware
+        showing up as the MAC, refresh rate as the serial number, ...).
+        """
+        while True:
+            try:
+                stale = await asyncio.wait_for(
+                    self._async_read_until_terminator(), timeout=0.05
+                )
+            except TimeoutError:
+                return
+            except (asyncio.IncompleteReadError, asyncio.LimitOverrunError, OSError):
+                return
+            _LOGGER.debug("RX (discarded stale) <- %s", stale)
+
     def _build_command(self, code: str, value: str | None, *, with_password: bool) -> bytes:
         cmd = f"~{self._projector_id}{code}"
         if value is not None:
@@ -164,15 +184,27 @@ class OptomaTransport(ABC):
                 f" ~{self._password}".encode("ascii"), b" ~<redacted>"
             )
         _LOGGER.debug("TX -> %s", log_payload)
+        await self._async_drain_stale_input()
         await self._async_write(payload)
 
         if not expect_reply:
             return ""
 
-        raw = await asyncio.wait_for(
-            self._async_read_until_terminator(), timeout=COMMAND_TIMEOUT
-        )
-        reply = raw.decode("ascii", errors="replace").strip()
+        # Read until we get an actual reply, skipping unsolicited INFOn
+        # status lines the projector pushes on its own (power transitions).
+        deadline = asyncio.get_running_loop().time() + COMMAND_TIMEOUT
+        while True:
+            remaining = deadline - asyncio.get_running_loop().time()
+            if remaining <= 0:
+                raise TimeoutError("Timed out waiting for the projector's reply")
+            raw = await asyncio.wait_for(
+                self._async_read_until_terminator(), timeout=remaining
+            )
+            reply = raw.decode("ascii", errors="replace").strip()
+            if not reply or reply.upper().startswith("INFO"):
+                _LOGGER.debug("RX (ignored unsolicited) <- %s", reply)
+                continue
+            break
         _LOGGER.debug("RX <- %s", reply)
 
         if reply == RESPONSE_FAIL or reply.startswith(RESPONSE_FAIL):
