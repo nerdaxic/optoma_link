@@ -4,9 +4,15 @@
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
 [![GitHub release](https://img.shields.io/github/v/release/nerdaxic/optoma_link?include_prereleases)](https://github.com/nerdaxic/optoma_link/releases)
 
-Control **Optoma projectors** from [Home Assistant](https://www.home-assistant.io/) over their RS232 ASCII protocol — either across the network (the projector's RJ-45 port, called **"RS232 by Telnet"** in Optoma's menus) or through a **direct RS232 serial cable** plugged into the machine running Home Assistant.
+Control **Optoma projectors** from [Home Assistant](https://www.home-assistant.io/) over their RS232 ASCII protocol, either across the network (the projector's RJ-45 port, called **"RS232 by Telnet"** in Optoma's menus) or through a **direct RS232 serial cable** plugged into the machine running Home Assistant.
+
+![Optoma Link projector device page in Home Assistant](images/integration.png)
 
 > **Status: alpha.** The bundled UHZ68LV profile is verified against real hardware. The other profiles are transcribed from Optoma's documentation and have not yet been confirmed on a physical unit. Expect rough edges, and please [open an issue](https://github.com/nerdaxic/optoma_link/issues) if something misbehaves.
+
+![Entities Optoma Link exposes for a projector](images/screenshot.png)
+
+*The entities Optoma Link exposes, as of version 2.3.0.*
 
 ## Features
 
@@ -95,6 +101,12 @@ Show or hide the projector's built-in test pattern (if its profile defines one).
 |---|---|---|---|
 | `enabled` | yes | `true` | `true` shows the pattern, `false` hides it. |
 | `entry_id` | no | | Target a specific projector if you have more than one. |
+
+## Known issues
+
+- **Setup fails while the projector is playing 3D.** The test-pattern step (and some other commands) are refused while the projector is displaying 3D content. Turn off 3D on the projector before running setup, then re-enable it afterwards.
+- **Some picture modes are content-specific.** The projector groups picture modes into SDR, HDR, Dolby Vision, and 3D "universes" and refuses a mode that does not match what is playing (for example, selecting a Dolby Vision mode during HDR10 content). Home Assistant surfaces this as a mode-conflict message.
+- **Write-only controls read Unknown until set.** See [How updates work](#how-updates-work-local-polling) above.
 
 ## Adding a projector profile
 

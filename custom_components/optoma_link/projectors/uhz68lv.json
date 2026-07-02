@@ -104,6 +104,11 @@
         "19": "Blending", "20": "Sport", "21": "HDR", "25": "HLG",
         "41": "AI-PQ", "42": "WCG", "44": "Golf Sim.", "45": "HDR10+",
         "48": "Dolby Vision Bright", "49": "Dolby Vision Dark"
+      },
+      "conflicts": {
+        "3D": "3D",
+        "HDR": "HDR", "HDR10+": "HDR", "HLG": "HDR",
+        "Dolby Vision Bright": "Dolby Vision", "Dolby Vision Dark": "Dolby Vision"
       }
     },
     {
@@ -209,7 +214,14 @@
       "name": "Resolution",
       "icon": "mdi:monitor-screenshot",
       "read": ["150", "4"],
-      "value_type": "str"
+      "value_type": "str",
+      "read_options": {
+        "480i": "720x480", "480p": "720x480",
+        "576i": "720x576", "576p": "720x576",
+        "720p": "1280x720",
+        "1080i": "1920x1080", "1080p": "1920x1080",
+        "2160p": "3840x2160", "4K": "3840x2160", "UHD": "3840x2160"
+      }
     },
     {
       "key": "refresh_rate",
@@ -224,7 +236,8 @@
       "icon": "mdi:barcode",
       "read": ["353", "1"],
       "value_type": "str",
-      "entity_category": "diagnostic"
+      "entity_category": "diagnostic",
+      "enabled_default": false
     },
     {
       "key": "ip_address",
@@ -241,7 +254,8 @@
       "icon": "mdi:identifier",
       "read": ["558", "1"],
       "value_type": "str",
-      "entity_category": "diagnostic"
+      "entity_category": "diagnostic",
+      "enabled_default": false
     }
   ],
   "device_info": [

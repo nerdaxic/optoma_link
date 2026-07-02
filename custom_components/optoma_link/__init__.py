@@ -104,14 +104,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # The device registry only accepts http/https/homeassistant URLs
     # (see _validate_device_info_fields in helpers/device_registry.py), so
-    # point at the projector's web admin page for LAN entries (using the IP
-    # the projector reports, when known) and omit the URL for serial.
+    # point the "Visit" link at exactly what the user entered for LAN entries
+    # (host or IP) and omit the URL for serial. The projector-reported IP is
+    # surfaced separately as a diagnostic sensor instead.
     is_serial = entry.data.get(CONF_CONNECTION_TYPE) == CONNECTION_TYPE_SERIAL
-    ip_address = _clean_detail(coordinator.data.get("ip_address"))
     if is_serial:
         configuration_url = None
     else:
-        configuration_url = f"http://{ip_address or entry.data[CONF_HOST]}"
+        configuration_url = f"http://{entry.data[CONF_HOST]}"
 
     mac_address = _clean_detail(coordinator.data.get("mac_address"))
     connections = (
@@ -146,13 +146,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         serial = _clean_detail(coordinator.data.get("serial_number"))
         firmware = _clean_detail(coordinator.data.get("firmware_version"))
         mac = _clean_detail(coordinator.data.get("mac_address"))
-        ip_addr = _clean_detail(coordinator.data.get("ip_address"))
         if serial and serial != current.serial_number:
             updates["serial_number"] = serial
         if firmware and firmware != current.sw_version:
             updates["sw_version"] = firmware
-        if ip_addr and not is_serial and f"http://{ip_addr}" != current.configuration_url:
-            updates["configuration_url"] = f"http://{ip_addr}"
         if mac:
             connection = (dr.CONNECTION_NETWORK_MAC, dr.format_mac(mac))
             if connection not in current.connections:

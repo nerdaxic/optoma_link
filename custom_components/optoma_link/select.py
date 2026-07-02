@@ -41,5 +41,8 @@ class OptomaSelect(OptomaEntity, SelectEntity):
 
     async def async_select_option(self, option: str) -> None:
         await async_guard_command(
-            self._spec, self.coordinator.async_write_select(self._spec, option)
+            self._spec,
+            self.coordinator.async_write_select(self._spec, option),
+            current=self.coordinator.data.get(self._key),
+            action=option,
         )

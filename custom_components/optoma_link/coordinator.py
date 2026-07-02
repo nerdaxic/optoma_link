@@ -132,8 +132,14 @@ class OptomaUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if read_options:
                 return read_options.get(raw, raw)
             if spec.get("format") == "ip":
-                # Optoma returns the IP with underscores, e.g. 192_168_1_100.
-                return raw.replace("_", ".")
+                # Optoma returns the IP underscore-separated and zero-padded,
+                # e.g. 010_127_040_241. Strip the padding so it is not later
+                # misread as octal (010 -> 8); fall back to a plain swap.
+                parts = raw.split("_")
+                try:
+                    return ".".join(str(int(part)) for part in parts)
+                except ValueError:
+                    return raw.replace("_", ".")
             value_type = spec.get("value_type", "str")
             if value_type == "int":
                 try:

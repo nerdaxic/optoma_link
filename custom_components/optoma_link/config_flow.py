@@ -67,9 +67,10 @@ _LOGGER = logging.getLogger(__name__)
 BAUD_RATE_CHOICES = ["9600", "19200", "38400", "57600", "115200"]
 
 # Appended to the confirm-model step when the projector is found in Eco standby.
+# Rendered as a Markdown blockquote so it stands out from the step's body text.
 STANDBY_ECO_HINT = (
-    "\n\nHeads up: this projector is in Eco standby mode. After a while powered "
-    "off it will stop answering Power On commands over the network. To keep it "
+    "\n\n> **⚠️ This projector is in Eco standby mode.** After a while "
+    "powered off it stops answering Power On commands over the network. To keep it "
     "controllable from Home Assistant at all times, set Power Mode (Standby) to "
     "Active in the projector's menu."
 )
