@@ -79,6 +79,11 @@ class OptomaUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         for spec in self.profile.get("sensors", []):
             if spec.get("read"):
                 yield "sensor", spec
+        # device_info reads populate the device registry (firmware, MAC, ...)
+        # without creating entities; parse them like sensors.
+        for spec in self.profile.get("device_info", []):
+            if spec.get("read"):
+                yield "sensor", spec
 
     async def _async_update_data(self) -> dict[str, Any]:
         data: dict[str, Any] = dict(self.data or {})
@@ -126,6 +131,9 @@ class OptomaUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             read_options = spec.get("read_options")
             if read_options:
                 return read_options.get(raw, raw)
+            if spec.get("format") == "ip":
+                # Optoma returns the IP with underscores, e.g. 192_168_1_100.
+                return raw.replace("_", ".")
             value_type = spec.get("value_type", "str")
             if value_type == "int":
                 try:

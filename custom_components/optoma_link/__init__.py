@@ -104,17 +104,25 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # The device registry only accepts http/https/homeassistant URLs
     # (see _validate_device_info_fields in helpers/device_registry.py), so
-    # point at the projector's web admin page for LAN entries and omit the
-    # URL entirely for serial connections.
-    if entry.data.get(CONF_CONNECTION_TYPE) == CONNECTION_TYPE_SERIAL:
+    # point at the projector's web admin page for LAN entries (using the IP
+    # the projector reports, when known) and omit the URL for serial.
+    is_serial = entry.data.get(CONF_CONNECTION_TYPE) == CONNECTION_TYPE_SERIAL
+    ip_address = _clean_detail(coordinator.data.get("ip_address"))
+    if is_serial:
         configuration_url = None
     else:
-        configuration_url = f"http://{entry.data[CONF_HOST]}"
+        configuration_url = f"http://{ip_address or entry.data[CONF_HOST]}"
+
+    mac_address = _clean_detail(coordinator.data.get("mac_address"))
+    connections = (
+        {(dr.CONNECTION_NETWORK_MAC, dr.format_mac(mac_address))} if mac_address else set()
+    )
 
     device_registry = dr.async_get(hass)
     device = device_registry.async_get_or_create(
         config_entry_id=entry.entry_id,
         identifiers={(DOMAIN, entry.entry_id)},
+        connections=connections,
         manufacturer=MANUFACTURER,
         model=profile.get("display_name", profile["model_id"]),
         name=entry.title,
@@ -125,22 +133,30 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     @callback
     def _refresh_device_details() -> None:
-        """Backfill serial/firmware once the projector reports real values.
+        """Backfill device details once the projector reports real values.
 
-        Some units answer the serial/firmware reads with a placeholder (e.g.
-        "0") on the first poll or two after connecting, so the real values can
-        arrive after the device has already been created.
+        Some units answer the serial/firmware/network reads with a placeholder
+        (e.g. "0") on the first poll or two after connecting, so the real values
+        can arrive after the device has already been created.
         """
         current = device_registry.async_get(device.id)
         if current is None:
             return
+        updates: dict = {}
         serial = _clean_detail(coordinator.data.get("serial_number"))
         firmware = _clean_detail(coordinator.data.get("firmware_version"))
-        updates: dict[str, str] = {}
+        mac = _clean_detail(coordinator.data.get("mac_address"))
+        ip_addr = _clean_detail(coordinator.data.get("ip_address"))
         if serial and serial != current.serial_number:
             updates["serial_number"] = serial
         if firmware and firmware != current.sw_version:
             updates["sw_version"] = firmware
+        if ip_addr and not is_serial and f"http://{ip_addr}" != current.configuration_url:
+            updates["configuration_url"] = f"http://{ip_addr}"
+        if mac:
+            connection = (dr.CONNECTION_NETWORK_MAC, dr.format_mac(mac))
+            if connection not in current.connections:
+                updates["merge_connections"] = {connection}
         if updates:
             device_registry.async_update_device(device.id, **updates)
 

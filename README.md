@@ -59,10 +59,21 @@ Setup runs entirely in the UI:
 2. **Enter connection details:**
    - *LAN:* host/IP, port (default `23`), 2-digit projector ID (default `00`), and an optional RS232 password. If the projector can't be reached, you'll get a hint pointing at **Network → LAN / Control** in its on-screen menu.
    - *Serial:* pick (or type) the serial port, baud rate (default `9600`, the Optoma standard), projector ID, and optional password.
-3. **Confirm the model:** the integration tries to auto-detect it. Confirm or pick from the dropdown, give the device a name, and optionally enter a MAC address to enable Wake-on-LAN.
+3. **Confirm the model:** the integration tries to auto-detect it. Confirm or pick from the dropdown and give the device a name (a short name like "Living Room Projector" reads best in entity IDs and voice assistants).
 4. **Test pattern** *(if the model supports it)*: toggle the projector's built-in test grid on and off to confirm you're connected to the right unit, then finish.
 
-The **poll interval** can be changed later from the integration's options (default 30 seconds, range 5–300 seconds).
+The **poll interval** can be changed later from the integration's options (default 30 seconds, range 5 to 300 seconds).
+
+## How updates work (local polling)
+
+Optoma Link talks to the projector over RS232, a simple question-and-answer protocol with no live push. Home Assistant polls the projector on an interval (default 30 seconds, configurable), so a change made on the projector can take up to that long to show up.
+
+Some controls are **write-only**: the projector accepts a value but offers no command to read it back (for example 3D, 3D Format, and Light Source Power). For these, Home Assistant can only show the last value it sent, which means:
+
+- After setup, before you have touched them, they read as **Unknown**. That is expected, set them once from Home Assistant and they will start showing a value.
+- If you change them with the projector's own remote, Home Assistant will not see it and its value goes stale until you set it again from Home Assistant.
+
+Everything with a read-back (power, mutes, input source, picture mode, brightness, contrast, lamp hours, temperature, and so on) is polled and stays in sync on its own.
 
 ## Services
 

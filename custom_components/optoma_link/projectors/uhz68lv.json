@@ -135,7 +135,7 @@
         "Field Sequential": "9"
       },
       "read": null,
-      "error_hint": "The projector only accepts a 3D format while the source is 1080p and 3D is on. 3D is not available for 4K/UHD signals."
+      "error_hint": "Turn on the 3D switch first, then choose a format. The projector rejects 3D format changes when 3D is off, or when the source is not 1080p (for example 4K/UHD)."
     },
     {
       "key": "light_source_power",
@@ -219,21 +219,34 @@
       "value_type": "str"
     },
     {
-      "key": "firmware_version",
-      "name": "Firmware Version",
-      "icon": "mdi:chip",
-      "read": ["122", "1"],
-      "value_type": "str",
-      "entity_category": "diagnostic"
-    },
-    {
       "key": "serial_number",
       "name": "Serial Number",
       "icon": "mdi:barcode",
       "read": ["353", "1"],
       "value_type": "str",
       "entity_category": "diagnostic"
+    },
+    {
+      "key": "ip_address",
+      "name": "IP Address",
+      "icon": "mdi:ip-network",
+      "read": ["87", "3"],
+      "value_type": "str",
+      "format": "ip",
+      "entity_category": "diagnostic"
+    },
+    {
+      "key": "projector_id",
+      "name": "Projector ID",
+      "icon": "mdi:identifier",
+      "read": ["558", "1"],
+      "value_type": "str",
+      "entity_category": "diagnostic"
     }
+  ],
+  "device_info": [
+    { "key": "firmware_version", "read": ["122", "1"] },
+    { "key": "mac_address", "read": ["555", "1"] }
   ],
   "buttons": [
     {

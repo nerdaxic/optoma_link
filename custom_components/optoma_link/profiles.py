@@ -39,7 +39,15 @@ def _load_profile_file(path: Path) -> dict[str, Any] | None:
         _LOGGER.error("Projector profile %s is missing keys: %s", path, missing)
         return None
 
-    for list_key in ("switches", "selects", "numbers", "binary_sensors", "sensors", "buttons"):
+    for list_key in (
+        "switches",
+        "selects",
+        "numbers",
+        "binary_sensors",
+        "sensors",
+        "buttons",
+        "device_info",
+    ):
         profile.setdefault(list_key, [])
 
     profile.setdefault("aliases", [])

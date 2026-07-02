@@ -63,3 +63,8 @@ RESPONSE_FAIL = "F"
 # Name", which returns a stable identifying string (e.g. "VDUHZLBLV" for the
 # UHZ68LV) rather than the small, ambiguous numeric index sub-value 1 returns.
 MODEL_NAME_READ = ("151", "3")
+
+# Read command for Standby Power Mode (0 = Eco, 1 = Active, 2/3 = Communication).
+# Used during setup to warn when a projector left in Eco standby will stop
+# answering network commands after a while powered off.
+STANDBY_MODE_READ = ("150", "16")

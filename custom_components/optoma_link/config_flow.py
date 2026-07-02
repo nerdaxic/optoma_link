@@ -46,6 +46,7 @@ from .const import (
     MAX_SCAN_INTERVAL,
     MIN_SCAN_INTERVAL,
     MODEL_NAME_READ,
+    STANDBY_MODE_READ,
 )
 from .profiles import (
     async_load_profiles,
@@ -64,6 +65,14 @@ from .transport import (
 _LOGGER = logging.getLogger(__name__)
 
 BAUD_RATE_CHOICES = ["9600", "19200", "38400", "57600", "115200"]
+
+# Appended to the confirm-model step when the projector is found in Eco standby.
+STANDBY_ECO_HINT = (
+    "\n\nHeads up: this projector is in Eco standby mode. After a while powered "
+    "off it will stop answering Power On commands over the network. To keep it "
+    "controllable from Home Assistant at all times, set Power Mode (Standby) to "
+    "Active in the projector's menu."
+)
 
 
 def _normalize_projector_id(raw: str) -> str:
@@ -98,6 +107,17 @@ async def _async_probe_transport(transport: OptomaTransport, projector_id: str) 
     return reply.strip() or None
 
 
+async def _async_read_standby_eco(transport: OptomaTransport) -> bool:
+    """Best-effort read of Standby Power Mode; True when set to Eco (0)."""
+    try:
+        reply = await transport.async_send(*STANDBY_MODE_READ)
+    except (OptomaCommandError, OptomaConnectionError):
+        return False
+    if reply[:2].casefold() == "ok":
+        reply = reply[2:]
+    return reply.strip() == "0"
+
+
 class _CannotResolveHost(Exception):
     """DNS lookup failed for the configured host/hostname."""
 
@@ -122,6 +142,7 @@ class OptomaConfigFlow(ConfigFlow, domain=DOMAIN):
         self._chosen_model_id: str | None = None
         self._name: str | None = None
         self._test_pattern_on = False
+        self._standby_eco = False
 
     # --- step 1: pick a transport ------------------------------------
 
@@ -171,6 +192,7 @@ class OptomaConfigFlow(ConfigFlow, domain=DOMAIN):
                 self._raw_model_reply = raw_reply
                 await async_load_profiles(self.hass)
                 self._guessed_model_id = guess_profile_id(raw_reply)
+                self._standby_eco = await _async_read_standby_eco(transport)
                 return await self.async_step_confirm_model()
 
         schema = vol.Schema(
@@ -228,6 +250,7 @@ class OptomaConfigFlow(ConfigFlow, domain=DOMAIN):
                 self._raw_model_reply = raw_reply
                 await async_load_profiles(self.hass)
                 self._guessed_model_id = guess_profile_id(raw_reply)
+                self._standby_eco = await _async_read_standby_eco(transport)
                 return await self.async_step_confirm_model()
 
         schema = vol.Schema(
@@ -273,15 +296,11 @@ class OptomaConfigFlow(ConfigFlow, domain=DOMAIN):
             return await self._async_finish()
 
         detected_text = describe_detected_model(self._guessed_model_id, self._raw_model_reply)
-        default_name = (
-            f"{profiles[default_model]['display_name']} Projector"
-            if default_model
-            else DEFAULT_NAME
-        )
+        standby_hint = STANDBY_ECO_HINT if self._standby_eco else ""
 
         schema = vol.Schema(
             {
-                vol.Required(CONF_NAME, default=default_name): str,
+                vol.Required(CONF_NAME, default="Projector"): str,
                 vol.Required(CONF_MODEL, default=default_model): SelectSelector(
                     SelectSelectorConfig(
                         options=_profile_select_options(), mode=SelectSelectorMode.DROPDOWN
@@ -293,7 +312,7 @@ class OptomaConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id="confirm_model",
             data_schema=schema,
             errors=errors,
-            description_placeholders={"detected": detected_text},
+            description_placeholders={"detected": detected_text, "standby_hint": standby_hint},
         )
 
     # --- step 4 (optional): toggleable test-pattern confirmation -------
