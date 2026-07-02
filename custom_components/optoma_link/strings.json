@@ -33,8 +33,7 @@
         "description": "{detected} Pick the matching profile below, or override it if it guessed wrong. Compare the picture in the documentation against your unit if you're not sure.",
         "data": {
           "name": "Name",
-          "model": "Projector model",
-          "mac_address": "MAC address (optional, enables Wake-on-LAN)"
+          "model": "Projector model"
         }
       },
       "test_pattern": {
@@ -51,7 +50,6 @@
       "cannot_resolve_host": "Could not resolve that hostname. Double-check the spelling, or use the projector's IP address instead.",
       "cannot_connect": "Could not connect to the projector. Check the host/port, that the projector is powered on, and that Network Function + Telnet are enabled in its on-screen menu.",
       "cannot_open_serial": "Could not open that serial port. Check the path/permissions, and that nothing else has it open.",
-      "invalid_mac": "That doesn't look like a valid MAC address (expected something like AA:BB:CC:DD:EE:FF).",
       "unknown": "Unexpected error while connecting to the projector."
     },
     "abort": {

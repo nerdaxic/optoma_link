@@ -17,7 +17,6 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .const import DOMAIN, RESPONSE_OK_PREFIX
 from .transport import OptomaCommandError, OptomaConnectionError, OptomaTransport
-from .wol import async_send_magic_packet
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -50,7 +49,6 @@ class OptomaUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         transport: OptomaTransport,
         profile: dict[str, Any],
         scan_interval: int,
-        mac_address: str | None = None,
     ) -> None:
         super().__init__(
             hass,
@@ -60,7 +58,6 @@ class OptomaUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
         self.transport = transport
         self.profile = profile
-        self.mac_address = mac_address
         self.data = {}
 
     # --- polling ------------------------------------------------------
@@ -126,6 +123,9 @@ class OptomaUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             except ValueError:
                 return None
         if entity_type == "sensor":
+            read_options = spec.get("read_options")
+            if read_options:
+                return read_options.get(raw, raw)
             value_type = spec.get("value_type", "str")
             if value_type == "int":
                 try:
@@ -147,15 +147,6 @@ class OptomaUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     # --- generic write helpers, used by every platform --------------------
 
     async def async_write_switch(self, spec: dict[str, Any], on: bool) -> None:
-        # Some projectors stop answering RS232/network power-on commands
-        # once they're in deep standby; give Wake-on-LAN a head start if a
-        # MAC address is configured, on a best-effort basis.
-        if on and spec["key"] == "power" and self.mac_address:
-            try:
-                await async_send_magic_packet(self.mac_address)
-            except (OSError, ValueError) as err:
-                _LOGGER.debug("Wake-on-LAN packet failed (continuing anyway): %s", err)
-
         code, value = spec["on"] if on else spec["off"]
         await self.transport.async_send(code, value)
         self._set_optimistic(spec["key"], on)

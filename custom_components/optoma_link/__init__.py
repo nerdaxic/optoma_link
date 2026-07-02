@@ -13,13 +13,18 @@ from datetime import timedelta
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, Platform
-from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
+from homeassistant.core import (
+    HomeAssistant,
+    ServiceCall,
+    ServiceResponse,
+    SupportsResponse,
+    callback,
+)
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv, device_registry as dr
 
 from .const import (
     CONF_CONNECTION_TYPE,
-    CONF_MAC_ADDRESS,
     CONF_MODEL,
     CONF_PROJECTOR_ID,
     CONF_SCAN_INTERVAL,
@@ -66,6 +71,16 @@ SET_TEST_PATTERN_SCHEMA = vol.Schema(
 )
 
 
+def _clean_detail(value: object) -> str | None:
+    """Drop empty or placeholder projector detail reads (e.g. serial "0")."""
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text or text == "0":
+        return None
+    return text
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up an Optoma Link projector from a config entry."""
     profiles = await async_load_profiles(hass)
@@ -80,11 +95,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     transport.bind(entry.data.get(CONF_PROJECTOR_ID, "00"))
 
     scan_interval = entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
-    mac_address = entry.data.get(CONF_MAC_ADDRESS)
 
-    coordinator = OptomaUpdateCoordinator(
-        hass, transport, profile, scan_interval, mac_address=mac_address
-    )
+    coordinator = OptomaUpdateCoordinator(hass, transport, profile, scan_interval)
 
     await coordinator.async_config_entry_first_refresh()
 
@@ -100,16 +112,39 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         configuration_url = f"http://{entry.data[CONF_HOST]}"
 
     device_registry = dr.async_get(hass)
-    device_registry.async_get_or_create(
+    device = device_registry.async_get_or_create(
         config_entry_id=entry.entry_id,
         identifiers={(DOMAIN, entry.entry_id)},
         manufacturer=MANUFACTURER,
         model=profile.get("display_name", profile["model_id"]),
         name=entry.title,
-        sw_version=coordinator.data.get("firmware_version"),
-        serial_number=coordinator.data.get("serial_number"),
+        sw_version=_clean_detail(coordinator.data.get("firmware_version")),
+        serial_number=_clean_detail(coordinator.data.get("serial_number")),
         configuration_url=configuration_url,
     )
+
+    @callback
+    def _refresh_device_details() -> None:
+        """Backfill serial/firmware once the projector reports real values.
+
+        Some units answer the serial/firmware reads with a placeholder (e.g.
+        "0") on the first poll or two after connecting, so the real values can
+        arrive after the device has already been created.
+        """
+        current = device_registry.async_get(device.id)
+        if current is None:
+            return
+        serial = _clean_detail(coordinator.data.get("serial_number"))
+        firmware = _clean_detail(coordinator.data.get("firmware_version"))
+        updates: dict[str, str] = {}
+        if serial and serial != current.serial_number:
+            updates["serial_number"] = serial
+        if firmware and firmware != current.sw_version:
+            updates["sw_version"] = firmware
+        if updates:
+            device_registry.async_update_device(device.id, **updates)
+
+    entry.async_on_unload(coordinator.async_add_listener(_refresh_device_details))
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))

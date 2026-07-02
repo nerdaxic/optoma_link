@@ -8,7 +8,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
 from .coordinator import OptomaUpdateCoordinator
-from .entity import OptomaEntity
+from .entity import OptomaEntity, async_guard_command
 
 
 async def async_setup_entry(
@@ -40,4 +40,6 @@ class OptomaSelect(OptomaEntity, SelectEntity):
         return self.coordinator.data.get(self._key)
 
     async def async_select_option(self, option: str) -> None:
-        await self.coordinator.async_write_select(self._spec, option)
+        await async_guard_command(
+            self._spec, self.coordinator.async_write_select(self._spec, option)
+        )

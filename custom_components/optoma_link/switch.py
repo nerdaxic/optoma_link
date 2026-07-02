@@ -10,7 +10,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
 from .coordinator import OptomaUpdateCoordinator
-from .entity import OptomaEntity
+from .entity import OptomaEntity, async_guard_command
 
 
 async def async_setup_entry(
@@ -38,10 +38,14 @@ class OptomaSwitch(OptomaEntity, SwitchEntity):
         return self.coordinator.data.get(self._key)
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        await self.coordinator.async_write_switch(self._spec, True)
+        await async_guard_command(
+            self._spec, self.coordinator.async_write_switch(self._spec, True)
+        )
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        await self.coordinator.async_write_switch(self._spec, False)
+        await async_guard_command(
+            self._spec, self.coordinator.async_write_switch(self._spec, False)
+        )
 
 
 class OptomaTestPatternSwitch(OptomaEntity, SwitchEntity):

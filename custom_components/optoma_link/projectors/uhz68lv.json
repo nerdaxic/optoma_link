@@ -3,18 +3,17 @@
   "model_id": "uhz68lv",
   "manufacturer": "Optoma",
   "display_name": "Optoma UHZ68LV",
-  "aliases": ["UHZ68LV"],
+  "aliases": ["UHZ68LV", "VDUHZLBLV"],
   "verified": true,
   "source": "Optoma official RS232 Command Table for the UHZ68LV (RS232.xlsx, rev. 1 / 2024-10-15), supplied by the integration's original author.",
   "detect": {
     "read_code": "151",
-    "read_sub": "1",
+    "read_sub": "3",
     "value_type": "string"
   },
   "serial_read": ["353", "1"],
   "capabilities": {
-    "three_d": true,
-    "wol": true
+    "three_d": true
   },
   "test_pattern": {
     "write_code": "195",
@@ -52,15 +51,17 @@
       "icon": "mdi:video-3d",
       "on": ["230", "1"],
       "off": ["230", "0"],
-      "read": null
+      "read": null,
+      "error_hint": "The projector only accepts 3D commands while the source is 1080p. 3D is not available for 4K/UHD signals; set the source to 1080p and try again."
     },
     {
       "key": "three_d_sync_invert",
       "name": "3D Sync Invert",
-      "icon": "mdi:swap-horizontal",
+      "icon": "mdi:glasses",
       "on": ["231", "0"],
       "off": ["231", "1"],
-      "read": null
+      "read": null,
+      "error_hint": "3D Sync Invert only works while the projector is in 3D mode."
     }
   ],
   "selects": [
@@ -126,14 +127,15 @@
     {
       "key": "three_d_format",
       "name": "3D Format",
-      "icon": "mdi:video-3d",
+      "icon": "mdi:video-3d-variant",
       "write_code": "405",
       "options": {
         "Auto": "0", "Side-by-Side (SBS)": "1", "Top and Bottom": "2",
         "Frame Sequential": "3", "Frame Packing": "7", "Off": "8",
         "Field Sequential": "9"
       },
-      "read": null
+      "read": null,
+      "error_hint": "The projector only accepts a 3D format while the source is 1080p and 3D is on. 3D is not available for 4K/UHD signals."
     },
     {
       "key": "light_source_power",
@@ -173,14 +175,7 @@
       "read": null
     }
   ],
-  "binary_sensors": [
-    {
-      "key": "three_d_active",
-      "name": "3D Active",
-      "icon": "mdi:video-3d",
-      "read": ["130", "1"]
-    }
-  ],
+  "binary_sensors": [],
   "sensors": [
     {
       "key": "lamp_hours",
@@ -195,11 +190,33 @@
       "key": "system_temperature",
       "name": "System Temperature",
       "icon": "mdi:thermometer",
-      "read": ["352", "1"],
+      "read": ["150", "18"],
       "value_type": "int",
       "unit": "°C",
       "device_class": "temperature",
       "state_class": "measurement"
+    },
+    {
+      "key": "temperature_status",
+      "name": "Temperature Status",
+      "icon": "mdi:thermometer-alert",
+      "read": ["155", "1"],
+      "value_type": "str",
+      "read_options": { "1": "Normal", "2": "Notice", "3": "Warning" }
+    },
+    {
+      "key": "resolution",
+      "name": "Resolution",
+      "icon": "mdi:monitor-screenshot",
+      "read": ["150", "4"],
+      "value_type": "str"
+    },
+    {
+      "key": "refresh_rate",
+      "name": "Refresh Rate",
+      "icon": "mdi:sine-wave",
+      "read": ["150", "19"],
+      "value_type": "str"
     },
     {
       "key": "firmware_version",

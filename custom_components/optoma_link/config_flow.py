@@ -30,7 +30,6 @@ from homeassistant.helpers.selector import (
 from .const import (
     CONF_BAUD_RATE,
     CONF_CONNECTION_TYPE,
-    CONF_MAC_ADDRESS,
     CONF_MODEL,
     CONF_PASSWORD,
     CONF_PROJECTOR_ID,
@@ -61,7 +60,6 @@ from .transport import (
     OptomaTcpTransport,
     OptomaTransport,
 )
-from .wol import build_magic_packet
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -122,7 +120,6 @@ class OptomaConfigFlow(ConfigFlow, domain=DOMAIN):
         self._guessed_model_id: str | None = None
         self._raw_model_reply: str | None = None
         self._chosen_model_id: str | None = None
-        self._mac_address: str | None = None
         self._name: str | None = None
         self._test_pattern_on = False
 
@@ -267,22 +264,13 @@ class OptomaConfigFlow(ConfigFlow, domain=DOMAIN):
         default_model = self._guessed_model_id or next(iter(sorted(profiles)), None)
 
         if user_input is not None:
-            mac_address = (user_input.get(CONF_MAC_ADDRESS) or "").strip()
-            if mac_address:
-                try:
-                    build_magic_packet(mac_address)
-                except ValueError:
-                    errors[CONF_MAC_ADDRESS] = "invalid_mac"
+            self._chosen_model_id = user_input[CONF_MODEL]
+            self._name = user_input[CONF_NAME]
 
-            if not errors:
-                self._chosen_model_id = user_input[CONF_MODEL]
-                self._mac_address = mac_address or None
-                self._name = user_input[CONF_NAME]
-
-                profile = profiles[self._chosen_model_id]
-                if profile.get("test_pattern"):
-                    return await self.async_step_test_pattern()
-                return await self._async_finish()
+            profile = profiles[self._chosen_model_id]
+            if profile.get("test_pattern"):
+                return await self.async_step_test_pattern()
+            return await self._async_finish()
 
         detected_text = describe_detected_model(self._guessed_model_id, self._raw_model_reply)
         default_name = (
@@ -299,7 +287,6 @@ class OptomaConfigFlow(ConfigFlow, domain=DOMAIN):
                         options=_profile_select_options(), mode=SelectSelectorMode.DROPDOWN
                     )
                 ),
-                vol.Optional(CONF_MAC_ADDRESS, default=""): str,
             }
         )
         return self.async_show_form(
@@ -356,7 +343,6 @@ class OptomaConfigFlow(ConfigFlow, domain=DOMAIN):
         data = {
             **self._connection_data,
             CONF_MODEL: self._chosen_model_id,
-            CONF_MAC_ADDRESS: self._mac_address,
         }
         return self.async_create_entry(
             title=self._name or DEFAULT_NAME,

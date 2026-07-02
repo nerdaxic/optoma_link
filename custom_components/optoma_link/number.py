@@ -8,7 +8,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
 from .coordinator import OptomaUpdateCoordinator
-from .entity import OptomaEntity
+from .entity import OptomaEntity, async_guard_command
 
 
 async def async_setup_entry(
@@ -44,4 +44,6 @@ class OptomaNumber(OptomaEntity, NumberEntity):
         return self.coordinator.data.get(self._key)
 
     async def async_set_native_value(self, value: float) -> None:
-        await self.coordinator.async_write_number(self._spec, value)
+        await async_guard_command(
+            self._spec, self.coordinator.async_write_number(self._spec, value)
+        )

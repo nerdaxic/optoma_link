@@ -25,7 +25,6 @@ CONF_CONNECTION_TYPE = "connection_type"
 CONF_PROJECTOR_ID = "projector_id"
 CONF_PASSWORD = "password"
 CONF_MODEL = "model"
-CONF_MAC_ADDRESS = "mac_address"
 CONF_SCAN_INTERVAL = "scan_interval"
 CONF_SERIAL_PORT = "serial_port"
 CONF_BAUD_RATE = "baud_rate"
@@ -59,7 +58,8 @@ RESPONSE_OK_PREFIX = "Ok"
 RESPONSE_PASS = "P"
 RESPONSE_FAIL = "F"
 
-# Well-known read command that exists (with the same code) across every
-# Optoma model we've seen documentation for. Used for model auto-detection
-# during config flow, independent of which profile ends up matching.
-MODEL_NAME_READ = ("151", "1")
+# Read command used for model auto-detection during config flow, independent
+# of which profile ends up matching. Sub-value 3 is the "Regulatory Model
+# Name", which returns a stable identifying string (e.g. "VDUHZLBLV" for the
+# UHZ68LV) rather than the small, ambiguous numeric index sub-value 1 returns.
+MODEL_NAME_READ = ("151", "3")
