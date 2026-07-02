@@ -102,16 +102,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
 
-    # The device registry only accepts http/https/homeassistant URLs
-    # (see _validate_device_info_fields in helpers/device_registry.py), so
-    # point the "Visit" link at exactly what the user entered for LAN entries
-    # (host or IP) and omit the URL for serial. The projector-reported IP is
-    # surfaced separately as a diagnostic sensor instead.
+    # Point the "Visit" link at exactly what the user entered for LAN entries,
+    # using the profile's management-UI scheme/port when it defines one (e.g.
+    # https://host:8088 for the UHZ68LV). Omit the URL entirely for serial.
+    # The projector-reported IP is surfaced separately as a diagnostic sensor.
     is_serial = entry.data.get(CONF_CONNECTION_TYPE) == CONNECTION_TYPE_SERIAL
     if is_serial:
         configuration_url = None
     else:
-        configuration_url = f"http://{entry.data[CONF_HOST]}"
+        web_ui = profile.get("web_ui") or {}
+        scheme = web_ui.get("scheme", "http")
+        host = entry.data[CONF_HOST]
+        port = web_ui.get("port")
+        configuration_url = f"{scheme}://{host}:{port}" if port else f"{scheme}://{host}"
 
     mac_address = _clean_detail(coordinator.data.get("mac_address"))
     connections = (
@@ -151,9 +154,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if firmware and firmware != current.sw_version:
             updates["sw_version"] = firmware
         if mac:
-            connection = (dr.CONNECTION_NETWORK_MAC, dr.format_mac(mac))
-            if connection not in current.connections:
-                updates["merge_connections"] = {connection}
+            # Replace (not merge) so a stale/malformed MAC connection left by an
+            # earlier build is cleared rather than accumulating.
+            wanted = {(dr.CONNECTION_NETWORK_MAC, dr.format_mac(mac))}
+            if current.connections != wanted:
+                updates["new_connections"] = wanted
         if updates:
             device_registry.async_update_device(device.id, **updates)
 

@@ -15,6 +15,7 @@
   "capabilities": {
     "three_d": true
   },
+  "web_ui": { "scheme": "https", "port": 8088 },
   "test_pattern": {
     "write_code": "195",
     "on": "1",
@@ -52,6 +53,7 @@
       "on": ["230", "1"],
       "off": ["230", "0"],
       "read": null,
+      "refresh_after": true,
       "error_hint": "The projector only accepts 3D commands while the source is 1080p. 3D is not available for 4K/UHD signals; set the source to 1080p and try again."
     },
     {
@@ -246,7 +248,8 @@
       "read": ["87", "3"],
       "value_type": "str",
       "format": "ip",
-      "entity_category": "diagnostic"
+      "entity_category": "diagnostic",
+      "enabled_default": false
     },
     {
       "key": "projector_id",

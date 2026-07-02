@@ -8,6 +8,7 @@ touching this file.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import timedelta
 from typing import Any
@@ -164,6 +165,17 @@ class OptomaUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         code, value = spec["on"] if on else spec["off"]
         await self.transport.async_send(code, value)
         self._set_optimistic(spec["key"], on)
+        if spec.get("refresh_after"):
+            self.hass.async_create_task(self._async_delayed_refresh())
+
+    async def _async_delayed_refresh(self, delay: float = 2.0) -> None:
+        """Re-poll shortly after a change the projector applies with a lag.
+
+        Toggling 3D, for example, also flips Picture Mode and Resolution on the
+        projector; a nudge here surfaces that without waiting a full interval.
+        """
+        await asyncio.sleep(delay)
+        await self.async_request_refresh()
 
     async def async_write_select(self, spec: dict[str, Any], option: str) -> None:
         value = spec["options"][option]

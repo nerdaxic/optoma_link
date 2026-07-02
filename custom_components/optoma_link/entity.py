@@ -43,17 +43,28 @@ async def async_guard_command(
         await awaitable
     except OptomaCommandError as err:
         conflicts = spec.get("conflicts") or {}
-        universe = conflicts.get(current)
-        if universe:
-            label = f"'{action}'" if action else "That option"
-            raise HomeAssistantError(
-                f"{label} is not available while the projector is in {universe} mode. "
-                "Match the setting to what is playing (SDR, HDR, Dolby Vision, or 3D)."
-            ) from err
-        hint = spec.get("error_hint")
-        raise HomeAssistantError(
-            f"The projector rejected this command. {hint}" if hint else str(err)
-        ) from err
+        current_universe = conflicts.get(current)
+        requested_universe = conflicts.get(action)
+        label = f"'{action}'" if action else "That option"
+        message: str | None = None
+        if current_universe and current_universe != requested_universe:
+            # The active content universe blocks the requested (other) mode.
+            message = (
+                f"{label} is not available while the projector is in "
+                f"{current_universe} mode. Match the setting to what is playing "
+                "(SDR, HDR, Dolby Vision, or 3D)."
+            )
+        elif requested_universe == "3D":
+            message = f"{label} picture mode is only available while 3D is turned on."
+        elif requested_universe:
+            message = (
+                f"{label} picture mode is only available while the projector is "
+                f"showing {requested_universe} content."
+            )
+        if message is None:
+            hint = spec.get("error_hint")
+            message = f"The projector rejected this command. {hint}" if hint else str(err)
+        raise HomeAssistantError(message) from err
     except OptomaConnectionError as err:
         raise HomeAssistantError(str(err)) from err
 
