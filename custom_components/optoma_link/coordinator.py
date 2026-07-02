@@ -16,10 +16,25 @@ from typing import Any
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import DOMAIN, RESPONSE_OK_PREFIX
+from .const import (
+    AUTO_SEND_FAULTS,
+    AUTO_SEND_MESSAGES,
+    AUTO_SEND_OPERATIONAL,
+    DOMAIN,
+    RESPONSE_OK_PREFIX,
+)
 from .transport import OptomaCommandError, OptomaConnectionError, OptomaTransport
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _parse_info_code(line: str) -> int | None:
+    """Extract the numeric code from an unsolicited ``INFOn`` status line."""
+    upper = line.strip().upper()
+    if not upper.startswith("INFO"):
+        return None
+    rest = upper[len("INFO"):].strip()
+    return int(rest) if rest.isdigit() else None
 
 
 def _strip_ok(reply: str) -> str:
@@ -60,6 +75,33 @@ class OptomaUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.transport = transport
         self.profile = profile
         self.data = {}
+        transport.set_status_callback(self._handle_status_line)
+
+    # --- unsolicited status pushes ------------------------------------
+
+    def _handle_status_line(self, line: str) -> None:
+        """Turn an unsolicited ``INFOn`` line into a status/power update.
+
+        Runs from the transport's read loop, so power transitions and faults
+        reflect in Home Assistant the moment the projector reports them.
+        """
+        code = _parse_info_code(line)
+        if code is None:
+            return
+        updates: dict[str, Any] = {}
+        message = AUTO_SEND_MESSAGES.get(code)
+        if message:
+            updates["status_message"] = message
+        if code in AUTO_SEND_OPERATIONAL:
+            status = AUTO_SEND_OPERATIONAL[code]
+            updates["status"] = status
+            updates["power"] = status in ("on", "warming_up")
+        elif code in AUTO_SEND_FAULTS:
+            updates["status"] = "error"
+        if not updates:
+            return
+        self.data = {**(self.data or {}), **updates}
+        self.async_set_updated_data(self.data)
 
     # --- polling ------------------------------------------------------
 
@@ -164,7 +206,13 @@ class OptomaUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def async_write_switch(self, spec: dict[str, Any], on: bool) -> None:
         code, value = spec["on"] if on else spec["off"]
         await self.transport.async_send(code, value)
-        self._set_optimistic(spec["key"], on)
+        updates: dict[str, Any] = {spec["key"]: on}
+        # Give the power button instant feedback; the projector's auto-sends
+        # (warming up -> on, cooling down -> standby) refine it moments later.
+        if spec["key"] == "power":
+            updates["status"] = "warming_up" if on else "cooling_down"
+        self.data = {**(self.data or {}), **updates}
+        self.async_set_updated_data(self.data)
         if spec.get("refresh_after"):
             self.hass.async_create_task(self._async_delayed_refresh())
 

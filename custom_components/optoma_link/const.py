@@ -68,3 +68,55 @@ MODEL_NAME_READ = ("151", "3")
 # Used during setup to warn when a projector left in Eco standby will stop
 # answering network commands after a while powered off.
 STANDBY_MODE_READ = ("150", "16")
+
+# --- "System Auto Send" status codes ---------------------------------------
+# The projector pushes these unsolicited as ``INFOn`` lines on power and fault
+# transitions. AUTO_SEND_OPERATIONAL maps the running states to a top-level
+# status string; every code in AUTO_SEND_FAULTS becomes status "error".
+AUTO_SEND_OPERATIONAL = {
+    0: "standby",
+    1: "warming_up",
+    2: "cooling_down",
+    24: "on",
+}
+AUTO_SEND_FAULTS = {
+    4, 5, 6, 7, 9, 10, 11, 12, 14, 15, 16, 17, 18, 21, 22, 23, 26, 27
+}
+# Human-readable label for each documented code (surfaced as an attribute).
+AUTO_SEND_MESSAGES = {
+    0: "Standby",
+    1: "Warming up",
+    2: "Cooling down",
+    3: "Signal out of range",
+    4: "Lamp/LED fail",
+    5: "Thermal switch error",
+    6: "Fan lock",
+    7: "Over temperature",
+    8: "Light source hours running out",
+    9: "Cover open",
+    10: "Lamp ignite fail",
+    11: "Format board power-on fail",
+    12: "Color wheel unexpected stop",
+    14: "Fan 1 lock",
+    15: "Fan 2 lock",
+    16: "Fan 3 lock",
+    17: "Fan 4 lock",
+    18: "Fan 5 lock",
+    19: "LAN fail, restarting",
+    20: "Light source below 60%",
+    21: "LD NTC 1 over temperature",
+    22: "LD NTC 2 over temperature",
+    23: "High ambient temperature",
+    24: "System ready",
+    26: "Fan 6 lock",
+    27: "Fan 7 lock",
+}
+# Internal status -> display label for the Status sensor.
+STATUS_LABELS = {
+    "standby": "Off",
+    "warming_up": "Warming up",
+    "on": "On",
+    "cooling_down": "Cooling down",
+    "error": "Error",
+}
+STATUS_OPTIONS = ["Off", "Warming up", "On", "Cooling down", "Error"]

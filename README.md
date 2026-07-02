@@ -20,7 +20,7 @@ Control **Optoma projectors** from [Home Assistant](https://www.home-assistant.i
 - **Automatic model detection** during setup, with a dropdown to confirm or override.
 - Optional **test pattern** step during setup, so you can visually confirm you're talking to the right unit.
 - Entities generated from the active profile: Power, AV/Audio Mute, Input Source, Picture Mode, Aspect Ratio, Brightness, Contrast, Sharpness, 3D controls, Light Source Power, Lamp/Light Source Hours, Temperature, Firmware Version, Serial Number, Resync, and more. The exact set depends on the model.
-- Optional **Wake-on-LAN**: some projectors stop answering power-on commands in deep standby. Supply the MAC address and the Power switch sends a magic packet first (also exposed as a standalone button).
+- A live **Status** sensor (Off, Warming up, On, Cooling down, Error) driven by the projector's own status pushes, so power transitions and faults (over-temperature, fan lock, and so on) show up immediately instead of at the next poll.
 - Adjustable **poll interval**, and an **RS232 password** field for units with serial security enabled.
 - Two services: `optoma_link.send_command` (raw passthrough) and `optoma_link.set_test_pattern`.
 

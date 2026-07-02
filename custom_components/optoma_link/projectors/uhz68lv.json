@@ -13,7 +13,8 @@
   },
   "serial_read": ["353", "1"],
   "capabilities": {
-    "three_d": true
+    "three_d": true,
+    "auto_status": true
   },
   "web_ui": { "scheme": "https", "port": 8088 },
   "test_pattern": {

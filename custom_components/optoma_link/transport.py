@@ -8,12 +8,21 @@ plugged into the host running Home Assistant. ``OptomaTransport`` factors
 out everything that's identical between the two (framing, locking, the
 optional password retry) and leaves only "open a connection" / "write
 bytes" / "read until CR" to the two concrete subclasses.
+
+A single background read loop owns every inbound line. Command replies are
+handed to the waiting command through a queue; the projector's unsolicited
+``INFOn`` status pushes (power transitions, faults) are routed to an optional
+status callback instead. This keeps the command/reply stream aligned even
+when the projector talks on its own -- otherwise a status line, or a reply
+that arrives after its command timed out, would be read as the answer to the
+*next* command and shift every reply after it by one.
 """
 from __future__ import annotations
 
 import asyncio
 import logging
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 
 import serial_asyncio_fast
 from homeassistant.const import CONF_HOST, CONF_PORT
@@ -34,6 +43,7 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 _TERMINATOR_BYTES = TERMINATOR.encode("ascii")
+_CONNECTION_LOST = object()  # sentinel enqueued when the read loop stops
 
 
 class OptomaCommandError(Exception):
@@ -44,6 +54,10 @@ class OptomaConnectionError(Exception):
     """Raised when the connection to the projector fails or times out."""
 
 
+class _RetryWithPassword(Exception):
+    """Internal signal: the first attempt failed and a password is configured."""
+
+
 class OptomaTransport(ABC):
     """Serializes ASCII RS232 commands over a single persistent connection."""
 
@@ -51,15 +65,27 @@ class OptomaTransport(ABC):
         self._projector_id = "00"
         self._password = password
         self._lock = asyncio.Lock()
+        self._replies: asyncio.Queue = asyncio.Queue()
+        self._read_task: asyncio.Task | None = None
+        self._status_callback: Callable[[str], None] | None = None
+        self._alive = False
 
     def bind(self, projector_id: str) -> None:
         """Set the projector ID used in every command (e.g. '00')."""
         self._projector_id = projector_id
 
+    def set_status_callback(self, callback: Callable[[str], None] | None) -> None:
+        """Register a callback for the projector's unsolicited ``INFOn`` lines."""
+        self._status_callback = callback
+
     @property
     @abstractmethod
+    def _stream_open(self) -> bool:
+        """Whether the underlying reader/writer pair is currently open."""
+
+    @property
     def connected(self) -> bool:
-        """Whether the underlying connection is currently open."""
+        return self._alive and self._stream_open
 
     @abstractmethod
     async def _async_open(self) -> None:
@@ -78,38 +104,69 @@ class OptomaTransport(ABC):
         """Read bytes up to and including the protocol terminator (CR)."""
 
     async def async_connect(self) -> None:
-        if self.connected:
-            return
-        try:
-            await self._async_open()
-        except (TimeoutError, OSError) as err:
-            raise OptomaConnectionError(str(err)) from err
+        if not self.connected:
+            try:
+                await self._async_open()
+            except (TimeoutError, OSError) as err:
+                raise OptomaConnectionError(str(err)) from err
+            self._alive = True
+        self._ensure_read_loop()
+
+    def _ensure_read_loop(self) -> None:
+        if self._read_task is None or self._read_task.done():
+            self._read_task = asyncio.ensure_future(self._async_read_loop())
 
     async def async_disconnect(self) -> None:
+        self._alive = False
+        task, self._read_task = self._read_task, None
+        if task is not None and not task.done():
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+            except Exception:  # noqa: BLE001
+                pass
         try:
             await self._async_close()
         except OSError:
             pass
+        self._drain_replies()
 
-    async def _async_drain_stale_input(self) -> None:
-        """Discard any complete lines already sitting in the receive buffer.
-
-        The projector pushes unsolicited ``INFOn`` status lines on power
-        transitions, and a reply that arrives after we stopped waiting for it
-        stays buffered. Either would otherwise be consumed as the answer to
-        the *next* command, shifting every reply after it by one (firmware
-        showing up as the MAC, refresh rate as the serial number, ...).
-        """
-        while True:
+    def _drain_replies(self) -> None:
+        """Discard anything left in the reply queue (stale replies, sentinels)."""
+        while not self._replies.empty():
             try:
-                stale = await asyncio.wait_for(
-                    self._async_read_until_terminator(), timeout=0.05
-                )
-            except TimeoutError:
-                return
-            except (asyncio.IncompleteReadError, asyncio.LimitOverrunError, OSError):
-                return
-            _LOGGER.debug("RX (discarded stale) <- %s", stale)
+                self._replies.get_nowait()
+            except asyncio.QueueEmpty:
+                break
+
+    async def _async_read_loop(self) -> None:
+        """Own every inbound line: route status pushes, queue command replies."""
+        try:
+            while True:
+                raw = await self._async_read_until_terminator()
+                line = raw.decode("ascii", errors="replace").strip()
+                if not line:
+                    continue
+                if line.upper().startswith("INFO"):
+                    _LOGGER.debug("RX (status) <- %s", line)
+                    if self._status_callback is not None:
+                        try:
+                            self._status_callback(line)
+                        except Exception:  # noqa: BLE001
+                            _LOGGER.exception("Status callback failed for %s", line)
+                    continue
+                _LOGGER.debug("RX <- %s", line)
+                self._replies.put_nowait(line)
+        except asyncio.CancelledError:
+            raise
+        except (asyncio.IncompleteReadError, asyncio.LimitOverrunError, OSError) as err:
+            _LOGGER.debug("Read loop ended: %s", err)
+        finally:
+            self._alive = False
+            # Unblock any command currently waiting on a reply.
+            self._replies.put_nowait(_CONNECTION_LOST)
 
     def _build_command(self, code: str, value: str | None, *, with_password: bool) -> bytes:
         cmd = f"~{self._projector_id}{code}"
@@ -139,28 +196,16 @@ class OptomaTransport(ABC):
             for attempt in range(2):
                 try:
                     await self.async_connect()
-                    reply = await self._async_send_once(code, value, expect_reply=expect_reply)
-                    return reply
+                    return await self._async_send_once(code, value, expect_reply=expect_reply)
                 except _RetryWithPassword:
                     try:
-                        reply = await self._async_send_once(
+                        return await self._async_send_once(
                             code, value, expect_reply=expect_reply, with_password=True
                         )
-                    except (
-                        TimeoutError,
-                        asyncio.IncompleteReadError,
-                        asyncio.LimitOverrunError,
-                        OSError,
-                    ) as err:
+                    except (OptomaConnectionError, OSError) as err:
                         await self.async_disconnect()
                         raise OptomaConnectionError(f"Lost connection: {err}") from err
-                    return reply
-                except (
-                    TimeoutError,
-                    asyncio.IncompleteReadError,
-                    asyncio.LimitOverrunError,
-                    OSError,
-                ) as err:
+                except (OptomaConnectionError, OSError) as err:
                     _LOGGER.debug(
                         "Command failed on attempt %s (%s); reconnecting", attempt, err
                     )
@@ -184,28 +229,19 @@ class OptomaTransport(ABC):
                 f" ~{self._password}".encode("ascii"), b" ~<redacted>"
             )
         _LOGGER.debug("TX -> %s", log_payload)
-        await self._async_drain_stale_input()
+        # Drop any late/stale reply still queued so we read *this* command's answer.
+        self._drain_replies()
         await self._async_write(payload)
 
         if not expect_reply:
             return ""
 
-        # Read until we get an actual reply, skipping unsolicited INFOn
-        # status lines the projector pushes on its own (power transitions).
-        deadline = asyncio.get_running_loop().time() + COMMAND_TIMEOUT
-        while True:
-            remaining = deadline - asyncio.get_running_loop().time()
-            if remaining <= 0:
-                raise TimeoutError("Timed out waiting for the projector's reply")
-            raw = await asyncio.wait_for(
-                self._async_read_until_terminator(), timeout=remaining
-            )
-            reply = raw.decode("ascii", errors="replace").strip()
-            if not reply or reply.upper().startswith("INFO"):
-                _LOGGER.debug("RX (ignored unsolicited) <- %s", reply)
-                continue
-            break
-        _LOGGER.debug("RX <- %s", reply)
+        try:
+            reply = await asyncio.wait_for(self._replies.get(), timeout=COMMAND_TIMEOUT)
+        except (TimeoutError, asyncio.TimeoutError) as err:
+            raise OptomaConnectionError("Timed out waiting for the projector's reply") from err
+        if reply is _CONNECTION_LOST:
+            raise OptomaConnectionError("Connection closed while awaiting a reply")
 
         if reply == RESPONSE_FAIL or reply.startswith(RESPONSE_FAIL):
             if not with_password and self._password:
@@ -213,10 +249,6 @@ class OptomaTransport(ABC):
             sent = f"~{self._projector_id}{code} {value or ''}".strip()
             raise OptomaCommandError(f"Projector rejected command '{sent}' (replied 'F')")
         return reply
-
-
-class _RetryWithPassword(Exception):
-    """Internal signal: the first attempt failed and a password is configured."""
 
 
 class OptomaTcpTransport(OptomaTransport):
@@ -230,7 +262,7 @@ class OptomaTcpTransport(OptomaTransport):
         self._writer: asyncio.StreamWriter | None = None
 
     @property
-    def connected(self) -> bool:
+    def _stream_open(self) -> bool:
         return self._writer is not None and not self._writer.is_closing()
 
     async def _async_open(self) -> None:
@@ -277,7 +309,7 @@ class OptomaSerialTransport(OptomaTransport):
         self._writer: asyncio.StreamWriter | None = None
 
     @property
-    def connected(self) -> bool:
+    def _stream_open(self) -> bool:
         return self._writer is not None and not self._writer.is_closing()
 
     async def _async_open(self) -> None:
