@@ -18,3 +18,7 @@ env/
 
 # macOS
 .DS_Store
+
+# Brand source art (not a Home Assistant brand filename; keep the full-res
+# working file locally, out of the repo)
+custom_components/optoma_link/brand/icon_full.png

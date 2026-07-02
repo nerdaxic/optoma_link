@@ -53,6 +53,14 @@
       "on": ["230", "1"],
       "off": ["230", "0"],
       "read": null
+    },
+    {
+      "key": "three_d_sync_invert",
+      "name": "3D Sync Invert",
+      "icon": "mdi:swap-horizontal",
+      "on": ["231", "0"],
+      "off": ["231", "1"],
+      "read": null
     }
   ],
   "selects": [
