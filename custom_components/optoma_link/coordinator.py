@@ -23,9 +23,17 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def _strip_ok(reply: str) -> str:
-    if reply.startswith(RESPONSE_OK_PREFIX):
-        return reply[len(RESPONSE_OK_PREFIX) :]
-    return reply.strip()
+    """Strip the ``OK`` marker Optoma prefixes to read replies.
+
+    The projector answers reads with ``OK`` followed by the value, but
+    firmwares vary in casing (``OK`` vs ``Ok``), so match case-insensitively.
+    Otherwise the prefix leaks into values (e.g. firmware read back as
+    ``OKC20M11S32``) and numeric reads fail to parse and show as Unknown.
+    """
+    reply = reply.strip()
+    if reply[: len(RESPONSE_OK_PREFIX)].casefold() == RESPONSE_OK_PREFIX.casefold():
+        return reply[len(RESPONSE_OK_PREFIX) :].strip()
+    return reply
 
 
 class OptomaUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):

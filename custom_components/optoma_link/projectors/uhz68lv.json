@@ -45,6 +45,14 @@
       "on": ["03", "1"],
       "off": ["03", "0"],
       "read": ["356", "1"]
+    },
+    {
+      "key": "three_d",
+      "name": "3D",
+      "icon": "mdi:video-3d",
+      "on": ["230", "1"],
+      "off": ["230", "0"],
+      "read": null
     }
   ],
   "selects": [
@@ -106,14 +114,6 @@
         "10": "4:3-II", "16": "21:9", "17": "32:9", "19": "Full",
         "20": "V-Stretch"
       }
-    },
-    {
-      "key": "three_d_mode",
-      "name": "3D Sync Mode",
-      "icon": "mdi:rotate-3d-variant",
-      "write_code": "230",
-      "options": { "Off": "0", "DLP-Link": "1", "VESA 3D / IR": "3", "On": "4" },
-      "read": null
     },
     {
       "key": "three_d_format",

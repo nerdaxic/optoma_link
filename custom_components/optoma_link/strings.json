@@ -10,7 +10,7 @@
       },
       "lan": {
         "title": "Network (RS232 by Telnet) connection",
-        "description": "Enter the projector's network details. {osd_hint}",
+        "description": "Before you start, set up the projector:\n\n1. Connect it to your network with an Ethernet cable.\n2. In the projector's menu, complete the initial network setup so it has an IP address.\n3. Enable Network > Control > Telnet, and note the port (default 23).\n4. Set Power Mode (Standby) to Active (disable Eco standby) so the projector keeps answering RS232 commands while it is powered off.\n\nThen enter the projector's network details below.",
         "data": {
           "host": "Host (IP address or hostname)",
           "port": "Port",
@@ -38,11 +38,12 @@
         }
       },
       "test_pattern": {
-        "title": "Test pattern is currently {state}",
+        "title": "Confirm with a test pattern",
+        "description": "Send the projector's built-in test grid to confirm you're talking to the right unit, then finish setup.",
         "menu_options": {
           "show_test_pattern": "Show test pattern on the projector",
           "hide_test_pattern": "Hide test pattern",
-          "finish_setup": "Looks right -- finish setup"
+          "finish_setup": "Looks right, finish setup"
         }
       }
     },

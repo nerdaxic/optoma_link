@@ -67,15 +67,6 @@ _LOGGER = logging.getLogger(__name__)
 
 BAUD_RATE_CHOICES = ["9600", "19200", "38400", "57600", "115200"]
 
-# Shown to the user (via description_placeholders) whenever a LAN connection
-# attempt fails, so they know where to look on the projector itself.
-LAN_REMEDIATION_HINT = (
-    "On the projector, open the on-screen menu and check Network > LAN: "
-    "make sure the Network Function is turned on, and under Network > "
-    "Control, that 'Telnet' is enabled and its port matches what you "
-    "entered here (default 23)."
-)
-
 
 def _normalize_projector_id(raw: str) -> str:
     raw = (raw or DEFAULT_PROJECTOR_ID).strip()
@@ -104,7 +95,7 @@ async def _async_probe_transport(transport: OptomaTransport, projector_id: str) 
         reply = await transport.async_send(*MODEL_NAME_READ)
     except OptomaCommandError:
         return None
-    if reply.startswith("Ok"):
+    if reply[:2].casefold() == "ok":
         reply = reply[2:]
     return reply.strip() or None
 
@@ -199,7 +190,6 @@ class OptomaConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id="lan",
             data_schema=schema,
             errors=errors,
-            description_placeholders={"osd_hint": LAN_REMEDIATION_HINT},
         )
 
     # --- step 2b: direct Serial RS232 ---------------------------------
@@ -296,7 +286,9 @@ class OptomaConfigFlow(ConfigFlow, domain=DOMAIN):
 
         detected_text = describe_detected_model(self._guessed_model_id, self._raw_model_reply)
         default_name = (
-            profiles[default_model]["display_name"] if default_model else DEFAULT_NAME
+            f"{profiles[default_model]['display_name']} Projector"
+            if default_model
+            else DEFAULT_NAME
         )
 
         schema = vol.Schema(
@@ -323,9 +315,6 @@ class OptomaConfigFlow(ConfigFlow, domain=DOMAIN):
         return self.async_show_menu(
             step_id="test_pattern",
             menu_options=["show_test_pattern", "hide_test_pattern", "finish_setup"],
-            description_placeholders={
-                "state": "showing" if self._test_pattern_on else "hidden"
-            },
         )
 
     async def async_step_show_test_pattern(
