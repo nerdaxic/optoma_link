@@ -29,6 +29,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Run HACS validation
-        uses: hacs/action@d556e736723344f83838d08488c983a15381059a # 22.5.0
+        uses: hacs/action@main # temporarily unpinned to diagnose a failure; will re-pin
         with:
           category: integration
