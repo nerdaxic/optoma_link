@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from datetime import timedelta
 from typing import Any
 
@@ -75,7 +76,20 @@ class OptomaUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.transport = transport
         self.profile = profile
         self.data = {}
+        self._seed_write_only_defaults()
         transport.set_status_callback(self._handle_status_line)
+
+    def _seed_write_only_defaults(self) -> None:
+        """Give write-only controls a sensible starting value.
+
+        Without a read-back the projector never tells us these, so a slider or
+        dropdown would otherwise sit at its minimum until first set. A spec's
+        ``default`` seeds a believable value instead (e.g. Sharpness 8).
+        """
+        for section in ("switches", "selects", "numbers"):
+            for spec in self.profile.get(section, []):
+                if spec.get("read") is None and "default" in spec:
+                    self.data[spec["key"]] = spec["default"]
 
     # --- unsolicited status pushes ------------------------------------
 
@@ -147,6 +161,19 @@ class OptomaUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
             any_success = True
             raw = _strip_ok(reply)
+            # Reject values that don't match the field's expected shape. During
+            # signal/power transitions the projector can briefly answer with the
+            # wrong field (a serial that looks like "2160p"); keep the last good
+            # value rather than showing garbage.
+            pattern = spec.get("pattern")
+            if pattern is not None and re.fullmatch(pattern, raw) is None:
+                _LOGGER.debug(
+                    "Read '%s' returned %r, which fails validation %s; keeping previous value",
+                    key,
+                    raw,
+                    pattern,
+                )
+                continue
             data[key] = self._parse_value(entity_type, spec, raw)
 
         if not any_success:
@@ -226,8 +253,15 @@ class OptomaUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         await self.async_request_refresh()
 
     async def async_write_select(self, spec: dict[str, Any], option: str) -> None:
-        value = spec["options"][option]
-        await self.transport.async_send(spec["write_code"], value)
+        target = spec["options"][option]
+        # An option is normally just the value for the spec's write_code, but it
+        # may instead be a [code, value] pair to reach a different command (e.g.
+        # Dynamic Black modes live on their own code, not the light-power one).
+        if isinstance(target, (list, tuple)):
+            code, value = target
+        else:
+            code, value = spec["write_code"], target
+        await self.transport.async_send(code, value)
         self._set_optimistic(spec["key"], option)
 
     async def async_write_number(self, spec: dict[str, Any], value: float) -> None:

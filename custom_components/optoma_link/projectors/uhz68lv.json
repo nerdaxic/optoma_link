@@ -65,6 +65,14 @@
       "off": ["231", "1"],
       "read": null,
       "error_hint": "3D Sync Invert only works while the projector is in 3D mode."
+    },
+    {
+      "key": "image_freeze",
+      "name": "Image Freeze",
+      "icon": "mdi:snowflake",
+      "on": ["04", "1"],
+      "off": ["04", "0"],
+      "read": null
     }
   ],
   "selects": [
@@ -152,7 +160,10 @@
       "write_code": "326",
       "options": {
         "100%": "0", "95%": "1", "90%": "2", "85%": "3", "80%": "4",
-        "75%": "5", "70%": "6", "65%": "7", "60%": "8", "55%": "9", "50%": "10"
+        "75%": "5", "70%": "6", "65%": "7", "60%": "8", "55%": "9", "50%": "10",
+        "Dynamic Black 1": ["191", "1"],
+        "Dynamic Black 2": ["191", "2"],
+        "Dynamic Black 3": ["191", "3"]
       },
       "read": null
     }
@@ -180,7 +191,8 @@
       "icon": "mdi:image-filter-vintage",
       "write_code": "23",
       "min": 1, "max": 15, "step": 1,
-      "read": null
+      "read": null,
+      "default": 8
     }
   ],
   "binary_sensors": [],
@@ -199,6 +211,7 @@
       "name": "System Temperature",
       "icon": "mdi:thermometer",
       "read": ["150", "18"],
+      "pattern": "-?\\d+",
       "value_type": "int",
       "unit": "°C",
       "device_class": "temperature",
@@ -218,6 +231,7 @@
       "icon": "mdi:monitor-screenshot",
       "read": ["150", "4"],
       "value_type": "str",
+      "pattern": "\\d+(x\\d+|[ip]\\d*)",
       "read_options": {
         "480i": "720x480", "480p": "720x480",
         "576i": "720x576", "576p": "720x576",
@@ -231,7 +245,8 @@
       "name": "Refresh Rate",
       "icon": "mdi:sine-wave",
       "read": ["150", "19"],
-      "value_type": "str"
+      "value_type": "str",
+      "pattern": "\\d+\\s?Hz"
     },
     {
       "key": "serial_number",
@@ -239,6 +254,7 @@
       "icon": "mdi:barcode",
       "read": ["353", "1"],
       "value_type": "str",
+      "pattern": "[A-Za-z0-9]{10,}",
       "entity_category": "diagnostic",
       "enabled_default": false
     },
@@ -249,6 +265,7 @@
       "read": ["87", "3"],
       "value_type": "str",
       "format": "ip",
+      "pattern": "\\d{1,3}(_\\d{1,3}){3}",
       "entity_category": "diagnostic",
       "enabled_default": false
     },
@@ -258,13 +275,14 @@
       "icon": "mdi:identifier",
       "read": ["558", "1"],
       "value_type": "str",
+      "pattern": "\\d{1,2}",
       "entity_category": "diagnostic",
       "enabled_default": false
     }
   ],
   "device_info": [
-    { "key": "firmware_version", "read": ["122", "1"] },
-    { "key": "mac_address", "read": ["555", "1"] }
+    { "key": "firmware_version", "read": ["122", "1"], "pattern": "(?=.*[A-Za-z])(?=.*\\d)[A-Za-z0-9]{6,}" },
+    { "key": "mac_address", "read": ["555", "1"], "pattern": "[0-9A-Fa-f]{2}([:-][0-9A-Fa-f]{2}){5}" }
   ],
   "buttons": [
     {
