@@ -20,7 +20,7 @@ from homeassistant.core import (
     SupportsResponse,
     callback,
 )
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
 from homeassistant.helpers import config_validation as cv, device_registry as dr
 
 from .const import (
@@ -30,6 +30,7 @@ from .const import (
     CONF_SCAN_INTERVAL,
     CONNECTION_TYPE_SERIAL,
     DEFAULT_SCAN_INTERVAL,
+    DISABLE_POLLING,
     DOMAIN,
     MANUFACTURER,
 )
@@ -98,7 +99,23 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     coordinator = OptomaUpdateCoordinator(hass, transport, profile, scan_interval)
 
-    await coordinator.async_config_entry_first_refresh()
+    if DISABLE_POLLING:
+        # Diagnostic build: open the connection so we still receive the
+        # projector's unsolicited status pushes and can send commands, but
+        # issue no read-back burst. Device details (firmware/serial/MAC) that
+        # the first poll would have populated stay empty here by design.
+        _LOGGER.warning(
+            "Optoma Link is running in DIAGNOSTIC no-polling mode: the "
+            "projector will not be queried. Only commands you trigger and the "
+            "projector's own status pushes are used. Set DISABLE_POLLING=False "
+            "in const.py to restore normal polling."
+        )
+        try:
+            await coordinator.transport.async_connect()
+        except OptomaConnectionError as err:
+            raise ConfigEntryNotReady(str(err)) from err
+    else:
+        await coordinator.async_config_entry_first_refresh()
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
 
@@ -175,6 +192,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Apply new options (poll interval) without requiring a reload."""
     coordinator: OptomaUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
+    if DISABLE_POLLING:
+        # Never let an options change re-arm the poll timer in the diagnostic
+        # build; leaving it None is the whole point.
+        return
     new_interval = entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
     coordinator.update_interval = timedelta(seconds=new_interval)
 

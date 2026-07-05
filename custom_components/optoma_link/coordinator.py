@@ -21,6 +21,7 @@ from .const import (
     AUTO_SEND_FAULTS,
     AUTO_SEND_MESSAGES,
     AUTO_SEND_OPERATIONAL,
+    DISABLE_POLLING,
     DOMAIN,
     RESPONSE_OK_PREFIX,
 )
@@ -71,7 +72,9 @@ class OptomaUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             hass,
             _LOGGER,
             name=DOMAIN,
-            update_interval=timedelta(seconds=scan_interval),
+            # In the diagnostic build there is no timer at all: passing None
+            # tells DataUpdateCoordinator never to schedule a refresh.
+            update_interval=None if DISABLE_POLLING else timedelta(seconds=scan_interval),
         )
         self.transport = transport
         self.profile = profile
@@ -143,6 +146,13 @@ class OptomaUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 yield "sensor", spec
 
     async def _async_update_data(self) -> dict[str, Any]:
+        if DISABLE_POLLING:
+            # Diagnostic build: never query the projector. Return the cached /
+            # optimistic state untouched; power and status still track the
+            # projector's unsolicited pushes via _handle_status_line. This also
+            # guards any stray async_request_refresh() call, so nothing polls.
+            return dict(self.data or {})
+
         data: dict[str, Any] = dict(self.data or {})
         any_success = False
         last_error: Exception | None = None
@@ -240,7 +250,7 @@ class OptomaUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             updates["status"] = "warming_up" if on else "cooling_down"
         self.data = {**(self.data or {}), **updates}
         self.async_set_updated_data(self.data)
-        if spec.get("refresh_after"):
+        if spec.get("refresh_after") and not DISABLE_POLLING:
             self.hass.async_create_task(self._async_delayed_refresh())
 
     async def _async_delayed_refresh(self, delay: float = 2.0) -> None:

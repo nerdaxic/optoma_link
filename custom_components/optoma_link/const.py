@@ -20,6 +20,23 @@ from __future__ import annotations
 DOMAIN = "optoma_link"
 MANUFACTURER = "Optoma"
 
+# --- Diagnostic build: polling kill switch ---------------------------------
+# When True, Home Assistant NEVER queries the projector. The integration only
+# opens the connection (to receive the projector's unsolicited ``INFOn`` status
+# pushes) and sends the commands you trigger (power, inputs, etc.). No read /
+# query commands are issued -- not on a timer, not at setup, not after a write.
+#
+# Why this exists: some UHZ68LV firmware crashes its internal ProjectorService
+# under our polling (the on-screen "ProjectorService: Central service has been
+# disconnected" toast, roughly hourly). This flag isolates whether *our* read
+# traffic is the trigger. If the crashing stops with this True, the polling is
+# implicated; re-enable it incrementally (see ``DIAGNOSTICS.md``) to find the
+# specific read that trips the firmware. If it still crashes, the firmware is
+# at fault on its own.
+#
+# This is the only switch to flip: set it False to restore normal behavior.
+DISABLE_POLLING = True
+
 # --- Config entry keys -----------------------------------------------------
 CONF_CONNECTION_TYPE = "connection_type"
 CONF_PROJECTOR_ID = "projector_id"
