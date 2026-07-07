@@ -100,6 +100,7 @@
       "options": {
         "Bright": "2", "Cinema": "3", "Reference": "4", "AI-PQ": "41",
         "3D": "9", "Dolby Vision Bright": "49", "Dolby Vision Dark": "50",
+        "Dolby Vision Vivid": "51",
         "Game": "12", "WCG": "42", "ISF Day": "14", "ISF Night": "15",
         "ISF 3D": "17", "Vivid": "16", "2D High Speed": "18",
         "Blending": "19", "Sport": "20", "HDR": "21", "HDR10+": "43",
@@ -113,13 +114,15 @@
         "11": "Film", "12": "Game", "14": "Vivid", "15": "ISF Day",
         "16": "ISF Night", "17": "ISF 3D", "18": "2D High Speed",
         "19": "Blending", "20": "Sport", "21": "HDR", "25": "HLG",
-        "41": "AI-PQ", "42": "WCG", "44": "Golf Sim.", "45": "HDR10+",
-        "48": "Dolby Vision Bright", "49": "Dolby Vision Dark"
+        "41": "AI-PQ", "42": "WCG", "44": "Golf Sim.",
+        "45": "Dolby Vision Bright", "46": "Dolby Vision Dark",
+        "47": "Dolby Vision Vivid"
       },
       "conflicts": {
         "3D": "3D",
         "HDR": "HDR", "HDR10+": "HDR", "HLG": "HDR",
-        "Dolby Vision Bright": "Dolby Vision", "Dolby Vision Dark": "Dolby Vision"
+        "Dolby Vision Bright": "Dolby Vision", "Dolby Vision Dark": "Dolby Vision",
+        "Dolby Vision Vivid": "Dolby Vision"
       }
     },
     {
