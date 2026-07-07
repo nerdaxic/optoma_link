@@ -20,22 +20,72 @@ from __future__ import annotations
 DOMAIN = "optoma_link"
 MANUFACTURER = "Optoma"
 
-# --- Diagnostic build: polling kill switch ---------------------------------
-# When True, Home Assistant NEVER queries the projector. The integration only
-# opens the connection (to receive the projector's unsolicited ``INFOn`` status
-# pushes) and sends the commands you trigger (power, inputs, etc.). No read /
-# query commands are issued -- not on a timer, not at setup, not after a write.
+# --- Diagnostic build: granular poll controls -----------------------------
+# This test build (branch ``test/no-polling``) polls the projector ONLY for the
+# groups enabled below. Everything else is never queried -- not on a timer, not
+# at setup, not after a write.
 #
-# Why this exists: some UHZ68LV firmware crashes its internal ProjectorService
-# under our polling (the on-screen "ProjectorService: Central service has been
-# disconnected" toast, roughly hourly). This flag isolates whether *our* read
-# traffic is the trigger. If the crashing stops with this True, the polling is
-# implicated; re-enable it incrementally (see ``DIAGNOSTICS.md``) to find the
-# specific read that trips the firmware. If it still crashes, the firmware is
-# at fault on its own.
+# Why: some UHZ68LV firmware crashes its internal ProjectorService under our
+# read traffic (the on-screen "ProjectorService: Central service has been
+# disconnected" toast, roughly hourly). The fully-disabled baseline (every
+# group False) ran stable for days, which confirmed the *reads* are the
+# trigger. Re-enable ONE group at a time (reload the integration after each
+# change) to find which read the firmware chokes on. See ``DIAGNOSTICS.md`` and
+# GitHub issue #1.
 #
-# This is the only switch to flip: set it False to restore normal behavior.
-DISABLE_POLLING = True
+# Notes:
+#   * If every group is False, nothing is polled at all -- the connection still
+#     opens so commands and the projector's unsolicited status pushes work.
+#   * Which entity keys belong to each group is defined in ``POLL_GROUP_KEYS``
+#     below. A readable entity whose key is not listed there (e.g. from another
+#     projector profile) is polled normally, so this only gates the UHZ68LV.
+POLL_GROUPS = {
+    "power":       True,   # 124/1 power state
+    "source":      False,  # 121/1 input source
+    "picture":     False,  # 123/1 mode, 125/1 brightness, 126/1 contrast, 127/1 aspect
+    "signal":      False,  # 150/4 resolution, 150/19 refresh rate
+    "av":          False,  # 355/1 AV mute, 356/1 audio mute
+    "laser":       False,  # 108/1 light source hours
+    "temperature": False,  # 150/18 system temp, 155/1 temp status
+    "device_info": False,  # 122/1 firmware, 555/1 MAC, 87/3 IP, 353/1 serial, 558/1 id
+}
+
+# Entity ``key`` -> poll group, for the UHZ68LV profile. Read-back-less controls
+# (3D, sharpness, light-source power, ...) are omitted because they are never
+# polled anyway. Keep in sync with the profile if new readable entities appear.
+POLL_GROUP_KEYS = {
+    "power": {"power"},
+    "source": {"input_source"},
+    "picture": {"picture_mode", "brightness", "contrast", "aspect_ratio"},
+    "signal": {"resolution", "refresh_rate"},
+    "av": {"av_mute", "audio_mute"},
+    "laser": {"lamp_hours"},
+    "temperature": {"system_temperature", "temperature_status"},
+    "device_info": {
+        "firmware_version", "mac_address", "ip_address",
+        "serial_number", "projector_id",
+    },
+}
+
+# Reverse lookup built once at import.
+_KEY_TO_POLL_GROUP = {
+    key: group for group, keys in POLL_GROUP_KEYS.items() for key in keys
+}
+
+# True if any group is enabled. When False the integration polls nothing.
+POLLING_ENABLED = any(POLL_GROUPS.values())
+
+
+def is_key_polled(key: str) -> bool:
+    """Whether the entity with this key should be polled in the diagnostic build.
+
+    A key mapped to a group is polled only if that group is enabled. A key not
+    in any group (e.g. another projector profile) is polled normally.
+    """
+    group = _KEY_TO_POLL_GROUP.get(key)
+    if group is None:
+        return True
+    return POLL_GROUPS.get(group, False)
 
 # --- Config entry keys -----------------------------------------------------
 CONF_CONNECTION_TYPE = "connection_type"

@@ -21,9 +21,10 @@ from .const import (
     AUTO_SEND_FAULTS,
     AUTO_SEND_MESSAGES,
     AUTO_SEND_OPERATIONAL,
-    DISABLE_POLLING,
     DOMAIN,
+    POLLING_ENABLED,
     RESPONSE_OK_PREFIX,
+    is_key_polled,
 )
 from .transport import OptomaCommandError, OptomaConnectionError, OptomaTransport
 
@@ -72,9 +73,10 @@ class OptomaUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             hass,
             _LOGGER,
             name=DOMAIN,
-            # In the diagnostic build there is no timer at all: passing None
-            # tells DataUpdateCoordinator never to schedule a refresh.
-            update_interval=None if DISABLE_POLLING else timedelta(seconds=scan_interval),
+            # Diagnostic build: with no group enabled there is no timer at all
+            # (None tells DataUpdateCoordinator never to schedule a refresh);
+            # otherwise poll the enabled groups on the configured interval.
+            update_interval=timedelta(seconds=scan_interval) if POLLING_ENABLED else None,
         )
         self.transport = transport
         self.profile = profile
@@ -123,34 +125,33 @@ class OptomaUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     # --- polling ------------------------------------------------------
 
     def _iter_readable_entities(self):
-        """Yield (entity_type, spec) for every profile entity with a read command."""
-        for spec in self.profile.get("switches", []):
-            if spec.get("read"):
-                yield "switch", spec
-        for spec in self.profile.get("selects", []):
-            if spec.get("read"):
-                yield "select", spec
-        for spec in self.profile.get("numbers", []):
-            if spec.get("read"):
-                yield "number", spec
-        for spec in self.profile.get("binary_sensors", []):
-            if spec.get("read"):
-                yield "binary_sensor", spec
-        for spec in self.profile.get("sensors", []):
-            if spec.get("read"):
-                yield "sensor", spec
+        """Yield (entity_type, spec) for every profile entity with a read command.
+
+        In the diagnostic build a spec is skipped unless its poll group is
+        enabled (see const.POLL_GROUPS / is_key_polled), so re-enabling one
+        group at a time re-enables exactly its reads.
+        """
         # device_info reads populate the device registry (firmware, MAC, ...)
         # without creating entities; parse them like sensors.
-        for spec in self.profile.get("device_info", []):
-            if spec.get("read"):
-                yield "sensor", spec
+        sections = (
+            ("switch", "switches"),
+            ("select", "selects"),
+            ("number", "numbers"),
+            ("binary_sensor", "binary_sensors"),
+            ("sensor", "sensors"),
+            ("sensor", "device_info"),
+        )
+        for entity_type, section in sections:
+            for spec in self.profile.get(section, []):
+                if spec.get("read") and is_key_polled(spec["key"]):
+                    yield entity_type, spec
 
     async def _async_update_data(self) -> dict[str, Any]:
-        if DISABLE_POLLING:
-            # Diagnostic build: never query the projector. Return the cached /
-            # optimistic state untouched; power and status still track the
-            # projector's unsolicited pushes via _handle_status_line. This also
-            # guards any stray async_request_refresh() call, so nothing polls.
+        if not POLLING_ENABLED:
+            # Diagnostic build with every group disabled: never query the
+            # projector. Return the cached / optimistic state untouched; power
+            # and status still track the projector's unsolicited pushes via
+            # _handle_status_line. Also guards any stray async_request_refresh().
             return dict(self.data or {})
 
         data: dict[str, Any] = dict(self.data or {})
@@ -250,7 +251,7 @@ class OptomaUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             updates["status"] = "warming_up" if on else "cooling_down"
         self.data = {**(self.data or {}), **updates}
         self.async_set_updated_data(self.data)
-        if spec.get("refresh_after") and not DISABLE_POLLING:
+        if spec.get("refresh_after") and POLLING_ENABLED:
             self.hass.async_create_task(self._async_delayed_refresh())
 
     async def _async_delayed_refresh(self, delay: float = 2.0) -> None:

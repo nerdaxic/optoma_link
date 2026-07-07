@@ -30,9 +30,10 @@ from .const import (
     CONF_SCAN_INTERVAL,
     CONNECTION_TYPE_SERIAL,
     DEFAULT_SCAN_INTERVAL,
-    DISABLE_POLLING,
     DOMAIN,
     MANUFACTURER,
+    POLL_GROUPS,
+    POLLING_ENABLED,
 )
 from .coordinator import OptomaUpdateCoordinator
 from .profiles import async_load_profiles
@@ -99,23 +100,31 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     coordinator = OptomaUpdateCoordinator(hass, transport, profile, scan_interval)
 
-    if DISABLE_POLLING:
-        # Diagnostic build: open the connection so we still receive the
+    active_groups = [group for group, on in POLL_GROUPS.items() if on]
+    if POLLING_ENABLED:
+        # Diagnostic build: poll only the enabled groups. The first refresh
+        # queries exactly those reads; disabled groups (and read-back-less
+        # controls) stay "unknown".
+        _LOGGER.warning(
+            "Optoma Link DIAGNOSTIC build: polling ONLY these groups: %s. "
+            "Edit POLL_GROUPS in const.py to change which reads are sent.",
+            ", ".join(active_groups),
+        )
+        await coordinator.async_config_entry_first_refresh()
+    else:
+        # No group enabled: open the connection so we still receive the
         # projector's unsolicited status pushes and can send commands, but
         # issue no read-back burst. Device details (firmware/serial/MAC) that
         # the first poll would have populated stay empty here by design.
         _LOGGER.warning(
-            "Optoma Link is running in DIAGNOSTIC no-polling mode: the "
-            "projector will not be queried. Only commands you trigger and the "
-            "projector's own status pushes are used. Set DISABLE_POLLING=False "
-            "in const.py to restore normal polling."
+            "Optoma Link DIAGNOSTIC build: polling is fully DISABLED (no group "
+            "enabled). Only commands you trigger and the projector's own status "
+            "pushes are used. Enable a group in POLL_GROUPS in const.py to poll."
         )
         try:
             await coordinator.transport.async_connect()
         except OptomaConnectionError as err:
             raise ConfigEntryNotReady(str(err)) from err
-    else:
-        await coordinator.async_config_entry_first_refresh()
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
 
@@ -192,9 +201,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Apply new options (poll interval) without requiring a reload."""
     coordinator: OptomaUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
-    if DISABLE_POLLING:
-        # Never let an options change re-arm the poll timer in the diagnostic
-        # build; leaving it None is the whole point.
+    if not POLLING_ENABLED:
+        # No poll group enabled: leave the timer disarmed (None) regardless of
+        # the interval option. With a group enabled, the option applies normally
+        # (e.g. the 30 s the user sets for the power-only test).
         return
     new_interval = entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
     coordinator.update_interval = timedelta(seconds=new_interval)
