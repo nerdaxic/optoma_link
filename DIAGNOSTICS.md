@@ -60,10 +60,30 @@ Behavior:
   in the integration options (Settings → Devices → Optoma Link → Configure).
   Entities in disabled groups stay "unknown".
 
+## Burst-size probe (`POLL_PAD_TO`)
+
+Testing showed sustained read *rate* is not the trigger (a faster power-only
+poll ran stable). Two hypotheses remain: a large **burst** of queries per cycle,
+or a **specific poison read**. `POLL_PAD_TO` in
+[`const.py`](custom_components/optoma_link/const.py) separates them: it inflates
+each poll cycle to that many reads by repeating a known-safe read (power,
+`124/1`) **without adding any new distinct read**.
+
+- Run with `power` only + `POLL_PAD_TO = 10` → ten power reads per cycle.
+- **Crashes** → the trigger is **burst / queue depth** (too many queries in one
+  tight cycle, whatever they are). Fix = cap/stagger reads per cycle.
+- **Stays clean** → burst count alone is not it; the crash is **content-specific**
+  → re-enable a group and sub-bisect.
+
+Set `POLL_PAD_TO = 0` to disable padding. Caveat: N identical reads may not
+perfectly proxy N *distinct* reads.
+
 ## Current setting
 
-`power` only, everything else off — the first re-enable step. Set the poll
-interval to **30 s** in the integration options.
+`power` only + **`POLL_PAD_TO = 10`** — the burst-size probe. Set the poll
+interval to **5 s** in the integration options (matches the prior test runs).
+This reproduces the ~10-read cycle that crashed (power + picture + device_info)
+using only safe power reads, so a crash here points at burst size, not content.
 
 ## Incremental re-enable plan
 

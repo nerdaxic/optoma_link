@@ -87,6 +87,26 @@ def is_key_polled(key: str) -> bool:
         return True
     return POLL_GROUPS.get(group, False)
 
+
+# --- Diagnostic build: burst-size probe ------------------------------------
+# Inflate each poll cycle to this many reads by repeating a known-safe read
+# (power, 124/1) after the real ones -- WITHOUT adding any new distinct read.
+# This isolates burst SIZE from burst CONTENT: e.g. run "power group only" with
+# POLL_PAD_TO = 10 to fire ten power reads per cycle.
+#
+#   * Crashes  -> the trigger is burst / queue depth (too many queries in one
+#     tight cycle, regardless of what they are). Fix = cap/stagger reads/cycle.
+#   * Stays clean -> burst count alone is not it; the crash is content-specific
+#     (a poison read) -- re-enable a group and sub-bisect.
+#
+# Caveat: N identical reads may not perfectly proxy N *distinct* reads if the
+# firmware handles repeated queries differently. Set 0 to disable padding.
+POLL_PAD_TO = 10
+
+# The read repeated for padding (a known-safe query). Kept here so it is easy to
+# change if power ever turns out to be the poison read.
+POLL_PAD_READ = ("124", "1")
+
 # --- Config entry keys -----------------------------------------------------
 CONF_CONNECTION_TYPE = "connection_type"
 CONF_PROJECTOR_ID = "projector_id"

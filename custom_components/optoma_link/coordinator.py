@@ -22,6 +22,8 @@ from .const import (
     AUTO_SEND_MESSAGES,
     AUTO_SEND_OPERATIONAL,
     DOMAIN,
+    POLL_PAD_READ,
+    POLL_PAD_TO,
     POLLING_ENABLED,
     RESPONSE_OK_PREFIX,
     is_key_polled,
@@ -157,10 +159,12 @@ class OptomaUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         data: dict[str, Any] = dict(self.data or {})
         any_success = False
         last_error: Exception | None = None
+        reads_sent = 0
 
         for entity_type, spec in self._iter_readable_entities():
             code, sub_value = spec["read"]
             key = spec["key"]
+            reads_sent += 1
             try:
                 reply = await self.transport.async_send(code, sub_value)
             except OptomaCommandError as err:
@@ -187,6 +191,8 @@ class OptomaUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 continue
             data[key] = self._parse_value(entity_type, spec, raw)
 
+        await self._async_pad_burst(reads_sent)
+
         if not any_success:
             if last_error is not None:
                 raise UpdateFailed(str(last_error))
@@ -195,6 +201,29 @@ class OptomaUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             _LOGGER.debug("Projector rejected every poll command; keeping cached state")
 
         return data
+
+    async def _async_pad_burst(self, reads_sent: int) -> None:
+        """Diagnostic: inflate the cycle to POLL_PAD_TO reads with a safe read.
+
+        Fires extra copies of POLL_PAD_READ (power) so the projector receives a
+        burst of POLL_PAD_TO queries this cycle without any new distinct read.
+        Isolates burst size from burst content. Best-effort: padding never fails
+        the update and its replies are discarded.
+        """
+        extra = POLL_PAD_TO - reads_sent
+        if extra <= 0:
+            return
+        code, sub_value = POLL_PAD_READ
+        _LOGGER.debug(
+            "Padding poll burst: %s real read(s) + %s repeat(s) of %s%s = %s total",
+            reads_sent, extra, code, sub_value, POLL_PAD_TO,
+        )
+        for _ in range(extra):
+            try:
+                await self.transport.async_send(code, sub_value)
+            except (OptomaCommandError, OptomaConnectionError):
+                # A struggling/offline projector: stop padding rather than pile on.
+                break
 
     @staticmethod
     def _parse_value(entity_type: str, spec: dict[str, Any], raw: str) -> Any:
