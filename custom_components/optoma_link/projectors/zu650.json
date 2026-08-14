@@ -128,6 +128,7 @@
       "read": ["108", "1"],
       "value_type": "int",
       "unit": "h",
+      "device_class": "duration",
       "state_class": "total_increasing"
     },
     {
