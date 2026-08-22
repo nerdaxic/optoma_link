@@ -12,7 +12,7 @@
     "value_type": "index",
     "index_map": { "6": "Optoma UHD" }
   },
-  "serial_read": ["353", "1"],
+  "serial_read": null,
   "capabilities": {
     "three_d": true,
     "auto_status": true
@@ -406,11 +406,6 @@
       "key": "current_power", "name": "Current Power", "icon": "mdi:lightning-bolt",
       "read": ["358", "1"], "value_type": "int", "unit": "W",
       "device_class": "power", "state_class": "measurement",
-      "entity_category": "diagnostic", "enabled_default": false
-    },
-    {
-      "key": "serial_number", "name": "Serial Number", "icon": "mdi:barcode",
-      "read": ["353", "1"], "value_type": "str", "pattern": "[A-Za-z0-9]{10,}",
       "entity_category": "diagnostic", "enabled_default": false
     },
     {

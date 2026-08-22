@@ -77,6 +77,11 @@ class OptomaUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.transport = transport
         self.profile = profile
         self.data = {}
+        # Optional device-information commands are particularly inconsistent:
+        # some firmwares silently ignore unsupported reads instead of replying
+        # ``F`` as the protocol specifies. Remember those commands for this
+        # coordinator's lifetime so they cannot delay every later poll.
+        self._silent_device_details: set[str] = set()
         # The user-configured interval; the *effective* update_interval relaxes
         # to STANDBY_SCAN_INTERVAL while the projector is off (see
         # _apply_dynamic_interval) and snaps back on a power-up push/command.
@@ -191,6 +196,8 @@ class OptomaUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def _missing_device_detail_specs(self, data: dict[str, Any]):
         """Device-detail specs we still lack a real (non-placeholder) value for."""
         for spec in self._iter_device_detail_specs():
+            if spec["key"] in self._silent_device_details:
+                continue
             value = data.get(spec["key"])
             text = str(value).strip() if value is not None else ""
             if not text or text == "0":
@@ -200,14 +207,35 @@ class OptomaUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self, data: dict[str, Any]
     ) -> dict[str, Any]:
         updates: dict[str, Any] = {}
+        received_reply = False
         for spec in self._missing_device_detail_specs(data):
             try:
                 value = await self._async_read_spec("sensor", spec)
             except OptomaCommandError as err:
+                received_reply = True
                 _LOGGER.debug(
                     "Device detail '%s' not supported: %s", spec["key"], err
                 )
                 continue
+            except OptomaConnectionError as err:
+                if not received_reply:
+                    # With no successful protocol exchange, silence may mean
+                    # the projector itself is unreachable. Preserve the setup
+                    # and update failure semantics in that case.
+                    raise
+                # This connection already answered another detail read. Some
+                # Optoma firmwares then remain silent for optional commands
+                # they do not implement (observed for UHZ65LV serial/MAC
+                # reads), contrary to the documented ``F`` response.
+                self._silent_device_details.add(spec["key"])
+                _LOGGER.debug(
+                    "Device detail '%s' gave no reply after connectivity was "
+                    "confirmed; treating it as unsupported for this session: %s",
+                    spec["key"],
+                    err,
+                )
+                continue
+            received_reply = True
             if value is not None:
                 updates[spec["key"]] = value
         return updates

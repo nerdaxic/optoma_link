@@ -8,6 +8,7 @@ still resolve on the first, exact-match attempt.
 import pytest
 
 from optoma_link.coordinator import OptomaUpdateCoordinator as Coordinator
+from optoma_link.transport import OptomaConnectionError
 
 # --- _normalize_numeric -----------------------------------------------
 
@@ -127,3 +128,54 @@ def test_number_parses_float():
 
 def test_number_returns_none_for_unparseable():
     assert Coordinator._parse_value("number", {}, "garbage") is None
+
+
+# --- optional device details ----------------------------------------------
+
+
+def _detail_coordinator():
+    coordinator = object.__new__(Coordinator)
+    coordinator.profile = {
+        "device_info": [
+            {"key": "firmware_version", "read": ["122", "1"]},
+        ],
+        "serial_read": ["353", "1"],
+        "sensors": [],
+    }
+    coordinator._silent_device_details = set()
+    return coordinator
+
+
+@pytest.mark.asyncio
+async def test_silent_optional_detail_is_skipped_after_confirmed_reply():
+    coordinator = _detail_coordinator()
+    reads = []
+
+    async def read_spec(_entity_type, spec):
+        reads.append(spec["key"])
+        if spec["key"] == "firmware_version":
+            return "C004"
+        raise OptomaConnectionError("Timed out waiting for reply")
+
+    coordinator._async_read_spec = read_spec
+    updates = await coordinator._async_read_missing_device_details({})
+
+    assert updates == {"firmware_version": "C004"}
+    assert reads == ["firmware_version", "serial_number"]
+    assert coordinator._silent_device_details == {"serial_number"}
+
+    reads.clear()
+    assert await coordinator._async_read_missing_device_details(updates) == {}
+    assert reads == []
+
+
+@pytest.mark.asyncio
+async def test_first_silent_detail_still_reports_unreachable_projector():
+    coordinator = _detail_coordinator()
+
+    async def read_spec(_entity_type, _spec):
+        raise OptomaConnectionError("Timed out waiting for reply")
+
+    coordinator._async_read_spec = read_spec
+    with pytest.raises(OptomaConnectionError):
+        await coordinator._async_read_missing_device_details({})
