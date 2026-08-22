@@ -368,11 +368,6 @@
       "entity_category": "diagnostic", "enabled_default": false
     },
     {
-      "key": "light_source_mode", "name": "Light Source Mode", "icon": "mdi:lightbulb-on-outline",
-      "read": ["150", "15"], "value_type": "str", "pattern": ".+",
-      "entity_category": "diagnostic", "enabled_default": false
-    },
-    {
       "key": "rs232_version", "name": "RS232 Protocol Version", "icon": "mdi:serial-port",
       "read": ["152", "1"], "value_type": "str", "pattern": ".+",
       "entity_category": "diagnostic", "enabled_default": false
@@ -401,12 +396,6 @@
       "key": "fan_4_speed", "name": "Fan 4 Speed", "icon": "mdi:fan",
       "read": ["351", "4"], "value_type": "int", "unit": "rpm",
       "state_class": "measurement", "entity_category": "diagnostic", "enabled_default": false
-    },
-    {
-      "key": "current_power", "name": "Current Power", "icon": "mdi:lightning-bolt",
-      "read": ["358", "1"], "value_type": "int", "unit": "W",
-      "device_class": "power", "state_class": "measurement",
-      "entity_category": "diagnostic", "enabled_default": false
     },
     {
       "key": "ip_address", "name": "IP Address", "icon": "mdi:ip-network",
