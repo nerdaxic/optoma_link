@@ -10,7 +10,7 @@
     "read_code": "151",
     "read_sub": "1",
     "value_type": "index",
-    "index_map": { "6": "UHZ65LV" }
+    "index_map": { "6": "Optoma UHD" }
   },
   "serial_read": ["353", "1"],
   "capabilities": {
@@ -426,8 +426,7 @@
     }
   ],
   "device_info": [
-    { "key": "firmware_version", "read": ["122", "1"], "pattern": "(?=.*[A-Za-z])(?=.*\\d)[A-Za-z0-9._-]{3,}" },
-    { "key": "mac_address", "read": ["555", "1"], "pattern": "[0-9A-Fa-f]{2}([:-][0-9A-Fa-f]{2}){5}" }
+    { "key": "firmware_version", "read": ["122", "1"], "pattern": "(?=.*[A-Za-z])(?=.*\\d)[A-Za-z0-9._-]{3,}" }
   ],
   "buttons": [
     {

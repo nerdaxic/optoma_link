@@ -5,11 +5,15 @@ validity, not just "is it JSON"), and pins the UHD60 profile's live-hardware
 verification down as an executable regression test rather than just a claim
 in its "verified" field.
 """
-from optoma_link.profiles import load_profiles
+from optoma_link.profiles import guess_profile_id, load_profiles
 
 
 def test_all_bundled_profiles_load():
-    assert set(load_profiles()) == {"uhz68lv", "w501", "zu650", "uhd60"}
+    assert set(load_profiles()) == {"uhz65lv", "uhz68lv", "w501", "zu650", "uhd60"}
+
+
+def test_uhz65lv_is_detected_from_legacy_uhd_family_index():
+    assert guess_profile_id("6") == "uhz65lv"
 
 
 def test_every_profile_has_required_shape():

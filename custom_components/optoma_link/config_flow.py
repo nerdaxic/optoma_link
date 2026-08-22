@@ -45,6 +45,7 @@ from .const import (
     DOMAIN,
     MAX_SCAN_INTERVAL,
     MIN_SCAN_INTERVAL,
+    MODEL_INDEX_READ,
     MODEL_NAME_READ,
     STANDBY_MODE_READ,
 )
@@ -99,13 +100,21 @@ async def _async_probe_transport(transport: OptomaTransport, projector_id: str) 
     """
     transport.bind(projector_id)
     await transport.async_connect()
-    try:
-        reply = await transport.async_send(*MODEL_NAME_READ)
-    except OptomaCommandError:
-        return None
-    if reply[:2].casefold() == "ok":
-        reply = reply[2:]
-    return reply.strip() or None
+    first_reply: str | None = None
+    for command in (MODEL_NAME_READ, MODEL_INDEX_READ):
+        try:
+            reply = await transport.async_send(*command)
+        except OptomaCommandError:
+            continue
+        if reply[:2].casefold() == "ok":
+            reply = reply[2:]
+        reply = reply.strip()
+        if not reply:
+            continue
+        first_reply = first_reply or reply
+        if guess_profile_id(reply) is not None:
+            return reply
+    return first_reply
 
 
 async def _async_read_standby_eco(transport: OptomaTransport) -> bool:
