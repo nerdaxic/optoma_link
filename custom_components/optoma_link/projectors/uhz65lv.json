@@ -12,7 +12,7 @@
     "value_type": "index",
     "index_map": { "6": "Optoma UHD" }
   },
-  "serial_read": ["353", "1"],
+  "serial_read": null,
   "capabilities": {
     "three_d": true,
     "auto_status": true
@@ -37,7 +37,7 @@
     },
     {
       "key": "three_d", "name": "3D (DLP-Link)", "icon": "mdi:video-3d",
-      "on": ["230", "1"], "off": ["230", "0"], "read": null,
+      "on": ["230", "4"], "off": ["230", "0"], "read": null,
       "refresh_after": true,
       "error_hint": "The projector only accepts 3D commands for a compatible source and timing."
     },
@@ -134,7 +134,7 @@
         "Frame Sequential": "3", "Frame Packing": "7", "Off": "8"
       },
       "read": null,
-      "error_hint": "Turn on 3D first, then choose a format. The projector may reject the command for an incompatible source or timing."
+      "error_hint": "3D Format can only be changed while 3D is active. Turn on 3D first, then choose a format."
     },
     {
       "key": "light_source_power", "name": "Light Source Power", "icon": "mdi:brightness-percent",
@@ -407,11 +407,6 @@
       "key": "fan_4_speed", "name": "Fan 4 Speed", "icon": "mdi:fan",
       "read": ["351", "4"], "value_type": "int", "unit": "rpm",
       "state_class": "measurement", "entity_category": "diagnostic", "enabled_default": false
-    },
-    {
-      "key": "serial_number", "name": "Serial Number", "icon": "mdi:barcode",
-      "read": ["353", "1"], "value_type": "str", "pattern": "[A-Za-z0-9]{10,}",
-      "entity_category": "diagnostic", "enabled_default": false
     },
     {
       "key": "ip_address", "name": "IP Address", "icon": "mdi:ip-network",
