@@ -317,12 +317,32 @@ class OptomaUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.update_interval = new_interval
 
     @staticmethod
-    def _parse_value(entity_type: str, spec: dict[str, Any], raw: str) -> Any:
+    def _normalize_numeric(value: str) -> str:
+        """Canonicalize a numeric reply for comparisons/lookups.
+
+        Every profile writes ``read_options`` keys and boolean checks against
+        bare integers ("0", "1", "21", ...), matching how Optoma's own docs
+        table them -- but firmwares are inconsistent about zero-padding and
+        sign characters in what they actually send back. Seen on a UHD60:
+        Picture Mode replied "03" for a documented "3", Aspect Ratio replied
+        "07" for "7", Brightness replied "+01" for "1". ``int()`` already
+        shrugs these off (unlike a literal ``0``-prefixed number in source
+        code, ``int("03")`` is not parsed as octal), so route lookups through
+        it before falling back to the raw string for genuinely non-numeric
+        values (e.g. the Resolution sensor's "1080p"/"4K" keys).
+        """
+        try:
+            return str(int(value))
+        except ValueError:
+            return value
+
+    @classmethod
+    def _parse_value(cls, entity_type: str, spec: dict[str, Any], raw: str) -> Any:
         if entity_type in ("switch", "binary_sensor"):
-            return raw == "1"
+            return cls._normalize_numeric(raw) == "1"
         if entity_type == "select":
             read_options = spec.get("read_options") or {}
-            return read_options.get(raw, raw)
+            return read_options.get(raw, read_options.get(cls._normalize_numeric(raw), raw))
         if entity_type == "number":
             try:
                 return float(raw) if "." in raw else int(raw)
@@ -331,7 +351,7 @@ class OptomaUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if entity_type == "sensor":
             read_options = spec.get("read_options")
             if read_options:
-                return read_options.get(raw, raw)
+                return read_options.get(raw, read_options.get(cls._normalize_numeric(raw), raw))
             if spec.get("format") == "ip":
                 # Optoma returns the IP underscore-separated and zero-padded,
                 # e.g. 010_127_040_241. Strip the padding so it is not later

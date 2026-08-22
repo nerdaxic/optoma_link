@@ -41,6 +41,7 @@ Optoma Link exposes the projector as first-class Home Assistant entities, so it 
 |---|---|---|
 | Optoma UHZ68LV | `uhz68lv` | ✅ Yes |
 | Optoma UHZ65LV | `uhz65lv` | ⚠️ From documentation only |
+| Optoma UHD60 | `uhd60` | ✅ Yes |
 | Optoma W501 / EW501 / EH501 / X501 | `w501` | ⚠️ From documentation only |
 | Optoma ZU650 / ZU650T / ZU650T+ | `zu650` | ⚠️ From documentation only |
 
