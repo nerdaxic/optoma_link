@@ -44,6 +44,7 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 _TERMINATOR_BYTES = TERMINATOR.encode("ascii")
+_TELNET_CLOSE_BYTES = f"Close{TERMINATOR}".encode("ascii")
 _CONNECTION_LOST = object()  # sentinel enqueued when the read loop stops
 
 # Some projectors' LAN "RS232 by Telnet" bridge is really a shell-style
@@ -301,6 +302,18 @@ class OptomaTcpTransport(OptomaTransport):
 
     async def _async_close(self) -> None:
         if self._writer is not None:
+            # Optoma documents ``Close`` + Enter as the normal way to end an
+            # RS232-by-Telnet session.  Give the projector's LAN service that
+            # explicit logout before closing the TCP socket; an abrupt FIN can
+            # leave some firmware versions with a stale console session.
+            if not self._writer.is_closing():
+                try:
+                    self._writer.write(_TELNET_CLOSE_BYTES)
+                    await self._writer.drain()
+                except (ConnectionError, OSError):
+                    # The peer may already have disappeared. Disconnect is
+                    # best-effort, so still close and release our local stream.
+                    pass
             self._writer.close()
             try:
                 await self._writer.wait_closed()

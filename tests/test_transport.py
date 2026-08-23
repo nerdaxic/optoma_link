@@ -1,4 +1,4 @@
-"""Unit tests for transport.py's console-noise-tolerant reply parsing.
+"""Unit tests for Optoma transport framing and connection handling.
 
 These pin down the failure modes discovered while bringing up the UHD60
 profile (see projectors/uhd60.json's "source" note): its LAN "RS232 by
@@ -8,7 +8,11 @@ captured from a live UHD60 over LAN, or a well-formed reply shape from the
 protocol spec shared by all four bundled profiles, to guard against a
 UHD60-motivated fix corrupting another model.
 """
-from optoma_link.transport import _strip_console_prompt
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+
+from optoma_link.transport import OptomaTcpTransport, _strip_console_prompt
 
 
 # --- Well-formed replies, as any of the four profiles would send them:
@@ -90,3 +94,43 @@ def test_ok_embedded_mid_word_is_not_a_false_match():
 def test_trailing_p_at_end_of_a_word_is_not_a_false_pass_ack():
     assert _strip_console_prompt("help") == "help"
     assert _strip_console_prompt("stop") == "stop"
+
+
+@pytest.mark.asyncio
+async def test_tcp_close_sends_documented_telnet_logout():
+    transport = OptomaTcpTransport("192.0.2.1", 23)
+    writer = MagicMock()
+    writer.drain = AsyncMock()
+    writer.wait_closed = AsyncMock()
+    writer.is_closing.return_value = False
+    transport._writer = writer
+    transport._reader = MagicMock()
+
+    await transport._async_close()
+
+    writer.write.assert_called_once_with(b"Close\r")
+    writer.drain.assert_awaited_once()
+    writer.close.assert_called_once()
+    writer.wait_closed.assert_awaited_once()
+    assert transport._writer is None
+    assert transport._reader is None
+
+
+@pytest.mark.asyncio
+async def test_tcp_close_still_releases_stream_when_logout_write_fails():
+    transport = OptomaTcpTransport("192.0.2.1", 23)
+    writer = MagicMock()
+    writer.drain = AsyncMock()
+    writer.wait_closed = AsyncMock()
+    writer.is_closing.return_value = False
+    writer.drain.side_effect = ConnectionResetError
+    transport._writer = writer
+    transport._reader = MagicMock()
+
+    await transport._async_close()
+
+    writer.write.assert_called_once_with(b"Close\r")
+    writer.close.assert_called_once()
+    writer.wait_closed.assert_awaited_once()
+    assert transport._writer is None
+    assert transport._reader is None
