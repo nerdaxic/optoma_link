@@ -15,6 +15,8 @@ from .coordinator import OptomaUpdateCoordinator
 from .entity import OptomaEntity
 
 _DEVICE_CLASS_MAP = {
+    "duration": SensorDeviceClass.DURATION,
+    "power": SensorDeviceClass.POWER,
     "temperature": SensorDeviceClass.TEMPERATURE,
 }
 _STATE_CLASS_MAP = {

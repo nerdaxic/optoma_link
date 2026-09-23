@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 
@@ -43,7 +44,35 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 _TERMINATOR_BYTES = TERMINATOR.encode("ascii")
+_TELNET_CLOSE_BYTES = f"Close{TERMINATOR}".encode("ascii")
 _CONNECTION_LOST = object()  # sentinel enqueued when the read loop stops
+
+# Some projectors' LAN "RS232 by Telnet" bridge is really a shell-style
+# console: it echoes a prompt like "Optoma_PJ> " ahead of the actual reply,
+# on the same line (seen on the UHD60) -- sometimes doubled
+# ("Optoma_PJ> Optoma_PJ> OK1"), sometimes with stray control/escape bytes
+# or an embedded line break in front of it (from the console redrawing its
+# prompt) that a plain ``.strip()`` doesn't remove. Left in place, any of
+# this defeats the P/F/Ok markers this protocol relies on -- write failures
+# go undetected (a prefixed "F" no longer matches RESPONSE_FAIL), and reads
+# come back as raw garbage, so read-backed entities show Unknown, or a
+# switch silently reads as off/False no matter the real state.
+#
+# Rather than stripping a prefix (which assumes the noise is contiguous
+# from position 0 -- not reliable, see above), search for a real marker
+# anywhere in the line and keep only from there on. A legitimate reply is
+# always exactly "P"/"F", "Ok" + a value, or "INFO" + a code, so this can't
+# mistake real protocol content elsewhere in the line for prompt noise --
+# the \b word-boundary anchors matter here, or e.g. the "ok" inside
+# "broken" (or a bare trailing "p"/"f" inside "help"/"stop") would
+# wrongly match as if it were part of a genuine reply.
+_MARKER_SEARCH_RE = re.compile(r"\bok\S*|\binfo\d+|\b[pf]\Z", re.IGNORECASE)
+
+
+def _strip_console_prompt(line: str) -> str:
+    """Keep only the real protocol reply, discarding any console noise before it."""
+    match = _MARKER_SEARCH_RE.search(line)
+    return line[match.start():] if match else line
 
 
 class OptomaCommandError(Exception):
@@ -147,6 +176,7 @@ class OptomaTransport(ABC):
             while True:
                 raw = await self._async_read_until_terminator()
                 line = raw.decode("ascii", errors="replace").strip()
+                line = _strip_console_prompt(line)
                 if not line:
                     continue
                 if line.upper().startswith("INFO"):
@@ -272,6 +302,18 @@ class OptomaTcpTransport(OptomaTransport):
 
     async def _async_close(self) -> None:
         if self._writer is not None:
+            # Optoma documents ``Close`` + Enter as the normal way to end an
+            # RS232-by-Telnet session.  Give the projector's LAN service that
+            # explicit logout before closing the TCP socket; an abrupt FIN can
+            # leave some firmware versions with a stale console session.
+            if not self._writer.is_closing():
+                try:
+                    self._writer.write(_TELNET_CLOSE_BYTES)
+                    await self._writer.drain()
+                except (ConnectionError, OSError):
+                    # The peer may already have disappeared. Disconnect is
+                    # best-effort, so still close and release our local stream.
+                    pass
             self._writer.close()
             try:
                 await self._writer.wait_closed()

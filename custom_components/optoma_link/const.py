@@ -69,6 +69,11 @@ RESPONSE_FAIL = "F"
 # Name", which returns a stable identifying string (e.g. "VDUHZLBLV" for the
 # UHZ68LV) rather than the small, ambiguous numeric index sub-value 1 returns.
 MODEL_NAME_READ = ("151", "3")
+# The older shared Optoma protocol table exposes only a broad display-family
+# index here (``6`` means "Optoma UHD"), not an exact product name. Profiles
+# sourced from that table may use the family response as their best available
+# detection signal.
+MODEL_INDEX_READ = ("151", "1")
 
 # Read command for Standby Power Mode (0 = Eco, 1 = Active, 2/3 = Communication).
 # Used during setup to warn when a projector left in Eco standby will stop

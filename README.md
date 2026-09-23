@@ -40,6 +40,8 @@ Optoma Link exposes the projector as first-class Home Assistant entities, so it 
 | Model profile | `model_id` | Verified on hardware |
 |---|---|---|
 | Optoma UHZ68LV | `uhz68lv` | ✅ Yes |
+| Optoma UHZ65LV | `uhz65lv` | ⚠️ From documentation only |
+| Optoma UHD60 | `uhd60` | ✅ Yes |
 | Optoma W501 / EW501 / EH501 / X501 | `w501` | ⚠️ From documentation only |
 | Optoma ZU650 / ZU650T / ZU650T+ | `zu650` | ⚠️ From documentation only |
 
@@ -167,7 +169,7 @@ Every entity has a `key` (unique within the profile), a `name`, and an optional 
 - **sensor**: `read`, optional `value_type` (`"str"`, `"int"`, or `"float"`), `unit`, `device_class` (`"temperature"`), `state_class` (`"measurement"` or `"total_increasing"`), `entity_category` (`"diagnostic"`).
 - **button**: `command` as `[code, value]`, optional `entity_category`.
 
-The three bundled profiles are worth reading as worked examples. Pull requests that add or correct profiles are very welcome — especially marking one `verified` after testing on real hardware.
+The bundled profiles are worth reading as worked examples. Pull requests that add or correct profiles are very welcome — especially marking one `verified` after testing on real hardware.
 
 ## Versioning
 

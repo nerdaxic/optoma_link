@@ -1,0 +1,10 @@
+# Test-only dependencies -- not needed to run the integration itself (see
+# custom_components/optoma_link/manifest.json for its runtime requirements).
+#
+#   pip install -r requirements_test.txt
+#   pytest
+pytest
+pytest-asyncio
+homeassistant
+pyserial-asyncio-fast>=0.13
+pyserial>=3.5

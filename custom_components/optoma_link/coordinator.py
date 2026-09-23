@@ -77,6 +77,11 @@ class OptomaUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.transport = transport
         self.profile = profile
         self.data = {}
+        # Optional device-information commands are particularly inconsistent:
+        # some firmwares silently ignore unsupported reads instead of replying
+        # ``F`` as the protocol specifies. Remember those commands for this
+        # coordinator's lifetime so they cannot delay every later poll.
+        self._silent_device_details: set[str] = set()
         # The user-configured interval; the *effective* update_interval relaxes
         # to STANDBY_SCAN_INTERVAL while the projector is off (see
         # _apply_dynamic_interval) and snaps back on a power-up push/command.
@@ -191,6 +196,8 @@ class OptomaUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def _missing_device_detail_specs(self, data: dict[str, Any]):
         """Device-detail specs we still lack a real (non-placeholder) value for."""
         for spec in self._iter_device_detail_specs():
+            if spec["key"] in self._silent_device_details:
+                continue
             value = data.get(spec["key"])
             text = str(value).strip() if value is not None else ""
             if not text or text == "0":
@@ -200,14 +207,35 @@ class OptomaUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self, data: dict[str, Any]
     ) -> dict[str, Any]:
         updates: dict[str, Any] = {}
+        received_reply = False
         for spec in self._missing_device_detail_specs(data):
             try:
                 value = await self._async_read_spec("sensor", spec)
             except OptomaCommandError as err:
+                received_reply = True
                 _LOGGER.debug(
                     "Device detail '%s' not supported: %s", spec["key"], err
                 )
                 continue
+            except OptomaConnectionError as err:
+                if not received_reply:
+                    # With no successful protocol exchange, silence may mean
+                    # the projector itself is unreachable. Preserve the setup
+                    # and update failure semantics in that case.
+                    raise
+                # This connection already answered another detail read. Some
+                # Optoma firmwares then remain silent for optional commands
+                # they do not implement (observed for UHZ65LV serial/MAC
+                # reads), contrary to the documented ``F`` response.
+                self._silent_device_details.add(spec["key"])
+                _LOGGER.debug(
+                    "Device detail '%s' gave no reply after connectivity was "
+                    "confirmed; treating it as unsupported for this session: %s",
+                    spec["key"],
+                    err,
+                )
+                continue
+            received_reply = True
             if value is not None:
                 updates[spec["key"]] = value
         return updates
@@ -317,12 +345,32 @@ class OptomaUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.update_interval = new_interval
 
     @staticmethod
-    def _parse_value(entity_type: str, spec: dict[str, Any], raw: str) -> Any:
+    def _normalize_numeric(value: str) -> str:
+        """Canonicalize a numeric reply for comparisons/lookups.
+
+        Every profile writes ``read_options`` keys and boolean checks against
+        bare integers ("0", "1", "21", ...), matching how Optoma's own docs
+        table them -- but firmwares are inconsistent about zero-padding and
+        sign characters in what they actually send back. Seen on a UHD60:
+        Picture Mode replied "03" for a documented "3", Aspect Ratio replied
+        "07" for "7", Brightness replied "+01" for "1". ``int()`` already
+        shrugs these off (unlike a literal ``0``-prefixed number in source
+        code, ``int("03")`` is not parsed as octal), so route lookups through
+        it before falling back to the raw string for genuinely non-numeric
+        values (e.g. the Resolution sensor's "1080p"/"4K" keys).
+        """
+        try:
+            return str(int(value))
+        except ValueError:
+            return value
+
+    @classmethod
+    def _parse_value(cls, entity_type: str, spec: dict[str, Any], raw: str) -> Any:
         if entity_type in ("switch", "binary_sensor"):
-            return raw == "1"
+            return cls._normalize_numeric(raw) == "1"
         if entity_type == "select":
             read_options = spec.get("read_options") or {}
-            return read_options.get(raw, raw)
+            return read_options.get(raw, read_options.get(cls._normalize_numeric(raw), raw))
         if entity_type == "number":
             try:
                 return float(raw) if "." in raw else int(raw)
@@ -331,7 +379,7 @@ class OptomaUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if entity_type == "sensor":
             read_options = spec.get("read_options")
             if read_options:
-                return read_options.get(raw, raw)
+                return read_options.get(raw, read_options.get(cls._normalize_numeric(raw), raw))
             if spec.get("format") == "ip":
                 # Optoma returns the IP underscore-separated and zero-padded,
                 # e.g. 010_127_040_241. Strip the padding so it is not later

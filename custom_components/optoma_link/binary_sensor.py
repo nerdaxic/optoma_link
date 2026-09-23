@@ -1,7 +1,7 @@
 """Binary sensors, generated from the active projector profile's 'binary_sensors' list."""
 from __future__ import annotations
 
-from homeassistant.components.binary_sensor import BinarySensorEntity
+from homeassistant.components.binary_sensor import BinarySensorDeviceClass, BinarySensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -9,6 +9,10 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .const import DOMAIN
 from .coordinator import OptomaUpdateCoordinator
 from .entity import OptomaEntity
+
+_DEVICE_CLASS_MAP = {
+    "connectivity": BinarySensorDeviceClass.CONNECTIVITY,
+}
 
 
 async def async_setup_entry(
@@ -23,6 +27,13 @@ async def async_setup_entry(
 
 class OptomaBinarySensor(OptomaEntity, BinarySensorEntity):
     """A profile-defined read-only flag (e.g. 3D Active)."""
+
+    def __init__(
+        self, coordinator: OptomaUpdateCoordinator, entry: ConfigEntry, spec: dict
+    ) -> None:
+        super().__init__(coordinator, entry, spec)
+        if spec.get("device_class") in _DEVICE_CLASS_MAP:
+            self._attr_device_class = _DEVICE_CLASS_MAP[spec["device_class"]]
 
     @property
     def is_on(self) -> bool | None:
