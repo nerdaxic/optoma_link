@@ -25,7 +25,12 @@ from .const import (
     RESPONSE_OK_PREFIX,
     STANDBY_SCAN_INTERVAL,
 )
-from .transport import OptomaCommandError, OptomaConnectionError, OptomaTransport
+from .transport import (
+    OptomaCommandError,
+    OptomaConnectionError,
+    OptomaTimeoutError,
+    OptomaTransport,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -288,6 +293,14 @@ class OptomaUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             except OptomaCommandError as err:
                 _LOGGER.debug("Read '%s' not supported by projector: %s", key, err)
                 continue
+            except OptomaTimeoutError as err:
+                # The socket is open and the write went out; the projector
+                # just isn't answering. Some models go fully silent for
+                # every command in deep standby -- that's not the same as
+                # being unreachable, so it must not count toward last_error
+                # (which would mark every entity unavailable below).
+                _LOGGER.debug("Read '%s' got no reply (%s); projector may be in standby", key, err)
+                continue
             except OptomaConnectionError as err:
                 last_error = err
                 continue
@@ -300,6 +313,8 @@ class OptomaUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # detail is in, this adds zero reads to the cycle.
         try:
             detail_updates = await self._async_read_missing_device_details(data)
+        except OptomaTimeoutError:
+            pass
         except OptomaConnectionError as err:
             last_error = err
         else:
@@ -310,9 +325,13 @@ class OptomaUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if attempted and not any_success:
             if last_error is not None:
                 raise UpdateFailed(str(last_error))
-            # Connection is alive but the projector rejected every read
-            # (typical for some models in standby); keep the cached data.
-            _LOGGER.debug("Projector rejected every poll command; keeping cached state")
+            # Connection is alive but the projector rejected or silently
+            # ignored every read (typical for some models in standby); keep
+            # the cached data -- including whatever power/status it last
+            # reported -- instead of marking every entity unavailable.
+            _LOGGER.debug(
+                "Projector rejected or did not answer any poll command; keeping cached state"
+            )
 
         self._apply_dynamic_interval(data)
         return data
@@ -409,9 +428,34 @@ class OptomaUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     # --- generic write helpers, used by every platform --------------------
 
+    async def _async_write_command(self, code: str, value: str | None) -> None:
+        """Send a write command, tolerating a silent/standby projector.
+
+        Optoma's protocol has no separate delivery ack -- a reply IS the
+        command's effect, confirmed. If the projector is reachable (the
+        socket opened, the write succeeded) but just doesn't reply in time,
+        the command almost certainly still landed: this is the normal way a
+        projector in deep standby behaves, including right after the
+        power-on write that wakes it. Treat that as best-effort success
+        rather than raising -- the entity's state was already set
+        optimistically by the caller, and the next poll corrects it if the
+        command genuinely didn't land. A real connection failure (can't
+        open the socket, connection dropped) still raises normally.
+        """
+        try:
+            await self.transport.async_send(code, value)
+        except OptomaTimeoutError as err:
+            _LOGGER.debug(
+                "No reply to '%s %s' (%s); assuming it was received and "
+                "will be confirmed on the next poll",
+                code,
+                value,
+                err,
+            )
+
     async def async_write_switch(self, spec: dict[str, Any], on: bool) -> None:
         code, value = spec["on"] if on else spec["off"]
-        await self.transport.async_send(code, value)
+        await self._async_write_command(code, value)
         updates: dict[str, Any] = {spec["key"]: on}
         # Give the power button instant feedback; the projector's auto-sends
         # (warming up -> on, cooling down -> standby) refine it moments later.
@@ -443,17 +487,17 @@ class OptomaUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             code, value = target
         else:
             code, value = spec["write_code"], target
-        await self.transport.async_send(code, value)
+        await self._async_write_command(code, value)
         self._set_optimistic(spec["key"], option)
 
     async def async_write_number(self, spec: dict[str, Any], value: float) -> None:
         num = int(value) if float(value).is_integer() else value
-        await self.transport.async_send(spec["write_code"], str(num))
+        await self._async_write_command(spec["write_code"], str(num))
         self._set_optimistic(spec["key"], value)
 
     async def async_press_button(self, spec: dict[str, Any]) -> None:
         code, value = spec["command"]
-        await self.transport.async_send(code, value)
+        await self._async_write_command(code, value)
 
     async def async_set_test_pattern(self, on: bool) -> None:
         """Used by the config-flow 'show test pattern' step and a button entity."""
@@ -461,7 +505,7 @@ class OptomaUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if not test_pattern:
             raise OptomaCommandError("This projector profile has no test pattern command")
         value = test_pattern["on"] if on else test_pattern["off"]
-        await self.transport.async_send(test_pattern["write_code"], value)
+        await self._async_write_command(test_pattern["write_code"], value)
         self._set_optimistic("test_pattern", on)
 
     # --- raw passthrough (backs the send_command service) ----------------
