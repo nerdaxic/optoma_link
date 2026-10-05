@@ -5,13 +5,10 @@ using values captured verbatim from its debug logs, and confirms
 non-padded replies -- what the other three profiles actually send --
 still resolve on the first, exact-match attempt.
 """
-from unittest.mock import AsyncMock, MagicMock
-
 import pytest
-from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from optoma_link.coordinator import OptomaUpdateCoordinator as Coordinator
-from optoma_link.transport import OptomaConnectionError, OptomaTimeoutError
+from optoma_link.transport import OptomaConnectionError
 
 # --- _normalize_numeric -----------------------------------------------
 
@@ -182,103 +179,3 @@ async def test_first_silent_detail_still_reports_unreachable_projector():
     coordinator._async_read_spec = read_spec
     with pytest.raises(OptomaConnectionError):
         await coordinator._async_read_missing_device_details({})
-
-
-# --- regression: issue #8 -- v2.9.0 deep-standby unavailable / can't power on ---
-#
-# On some models (reported on a UHZ68LV over LAN), once the projector has
-# been in standby for about a minute it stops replying to anything at all --
-# the TCP socket stays open and every write still goes out, but no reply
-# ever comes back. Before this fix, OptomaConnectionError covered both that
-# silence AND a genuinely dead connection, so _async_update_data treated
-# "asleep" the same as "unreachable" and marked every entity unavailable
-# (losing the power switch needed to wake it back up), and a write command
-# that triggered the same silence surfaced as a failed service call even
-# though it had, in fact, reached the projector and woken it up.
-
-
-def _poll_coordinator(read_error: Exception) -> Coordinator:
-    """A coordinator whose one 'power' read always raises ``read_error``."""
-    coordinator = object.__new__(Coordinator)
-    coordinator.profile = {
-        "switches": [
-            {
-                "key": "power",
-                "read": ["124", "1"],
-                "on": ("124", "1"),
-                "off": ("124", "0"),
-            }
-        ],
-    }
-    # Cached from before the projector went silent -- what a real standby
-    # transition leaves behind, and what should survive if read_error is
-    # mere silence rather than a real connection failure.
-    coordinator.data = {"power": False, "status": "cooling_down"}
-    coordinator._silent_device_details = set()
-    coordinator.async_contexts = lambda: {"power"}
-    coordinator._apply_dynamic_interval = lambda data: None
-
-    async def read_spec(_entity_type, _spec):
-        raise read_error
-
-    coordinator._async_read_spec = read_spec
-    return coordinator
-
-
-@pytest.mark.asyncio
-async def test_silent_standby_keeps_cached_data_instead_of_update_failed():
-    coordinator = _poll_coordinator(OptomaTimeoutError("Timed out waiting for the projector's reply"))
-    data = await coordinator._async_update_data()
-    # No UpdateFailed raised (which is what would mark every entity
-    # unavailable), and the last known state is still there.
-    assert data == {"power": False, "status": "cooling_down"}
-
-
-@pytest.mark.asyncio
-async def test_genuine_connection_failure_still_raises_update_failed():
-    # A real connection problem (refused, host unreachable, ...) must still
-    # surface as UpdateFailed -- only the "connected but silent" case is new.
-    coordinator = _poll_coordinator(OptomaConnectionError("Connection refused"))
-    with pytest.raises(UpdateFailed):
-        await coordinator._async_update_data()
-
-
-def _write_coordinator() -> Coordinator:
-    coordinator = object.__new__(Coordinator)
-    coordinator.data = {}
-    coordinator.transport = AsyncMock()
-    coordinator.hass = MagicMock()
-    coordinator.async_set_updated_data = MagicMock()
-    coordinator._apply_dynamic_interval = MagicMock()
-    return coordinator
-
-
-@pytest.mark.asyncio
-async def test_write_command_tolerates_a_silent_reply():
-    coordinator = _write_coordinator()
-    coordinator.transport.async_send.side_effect = OptomaTimeoutError("no reply")
-    await coordinator._async_write_command("124", "1")  # must not raise
-
-
-@pytest.mark.asyncio
-async def test_write_command_still_raises_on_a_real_connection_failure():
-    coordinator = _write_coordinator()
-    coordinator.transport.async_send.side_effect = OptomaConnectionError("refused")
-    with pytest.raises(OptomaConnectionError):
-        await coordinator._async_write_command("124", "1")
-
-
-@pytest.mark.asyncio
-async def test_power_on_from_deep_standby_does_not_raise():
-    # The exact reported failure: switch.turn_on while the projector is in
-    # deep standby used to come back as a failed service call (a timeout
-    # wrapped in HomeAssistantError by entity.py's async_guard_command),
-    # even though the write had already reached and woken the projector.
-    coordinator = _write_coordinator()
-    coordinator.transport.async_send.side_effect = OptomaTimeoutError("no reply")
-    spec = {"key": "power", "on": ("124", "1"), "off": ("124", "0")}
-
-    await coordinator.async_write_switch(spec, True)  # must not raise
-
-    assert coordinator.data["power"] is True
-    assert coordinator.data["status"] == "warming_up"

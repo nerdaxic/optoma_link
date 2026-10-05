@@ -75,35 +75,12 @@ def _strip_console_prompt(line: str) -> str:
     return line[match.start():] if match else line
 
 
-def _as_connection_error(err: Exception, message: str) -> "OptomaConnectionError":
-    """Re-wrap a connection-layer failure, preserving OptomaTimeoutError.
-
-    Keeps "nothing answered in time" distinguishable from a dead connection
-    even after it has been caught, logged, and re-raised with added context.
-    """
-    error_type = type(err) if isinstance(err, OptomaConnectionError) else OptomaConnectionError
-    return error_type(message)
-
-
 class OptomaCommandError(Exception):
     """Raised when the projector reports a command failure (``F``)."""
 
 
 class OptomaConnectionError(Exception):
     """Raised when the connection to the projector fails or times out."""
-
-
-class OptomaTimeoutError(OptomaConnectionError):
-    """A command was sent on an open connection, but nothing answered in time.
-
-    Distinct from the base ``OptomaConnectionError`` (failed to connect, or
-    the connection dropped mid-exchange): here the socket stayed open and the
-    write succeeded, so the command most likely reached the projector. Some
-    models simply go silent for every command while in deep standby, which
-    is not the same failure as the projector being unreachable -- callers
-    that want to tell the two apart (e.g. not marking entities unavailable
-    just because the projector is asleep) can catch this more specific type.
-    """
 
 
 class _RetryWithPassword(Exception):
@@ -257,14 +234,14 @@ class OptomaTransport(ABC):
                         )
                     except (OptomaConnectionError, OSError) as err:
                         await self.async_disconnect()
-                        raise _as_connection_error(err, f"Lost connection: {err}") from err
+                        raise OptomaConnectionError(f"Lost connection: {err}") from err
                 except (OptomaConnectionError, OSError) as err:
                     _LOGGER.debug(
                         "Command failed on attempt %s (%s); reconnecting", attempt, err
                     )
                     await self.async_disconnect()
                     if attempt == 1:
-                        raise _as_connection_error(err, f"Lost connection: {err}") from err
+                        raise OptomaConnectionError(f"Lost connection: {err}") from err
             raise OptomaConnectionError("Unreachable")  # pragma: no cover
 
     async def _async_send_once(
@@ -292,7 +269,7 @@ class OptomaTransport(ABC):
         try:
             reply = await asyncio.wait_for(self._replies.get(), timeout=COMMAND_TIMEOUT)
         except (TimeoutError, asyncio.TimeoutError) as err:
-            raise OptomaTimeoutError("Timed out waiting for the projector's reply") from err
+            raise OptomaConnectionError("Timed out waiting for the projector's reply") from err
         if reply is _CONNECTION_LOST:
             raise OptomaConnectionError("Connection closed while awaiting a reply")
 

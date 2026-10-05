@@ -12,12 +12,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from optoma_link.transport import (
-    OptomaConnectionError,
-    OptomaTcpTransport,
-    OptomaTimeoutError,
-    _strip_console_prompt,
-)
+from optoma_link.transport import OptomaTcpTransport, _strip_console_prompt
 
 
 # --- Well-formed replies, as any of the four profiles would send them:
@@ -119,73 +114,6 @@ async def test_tcp_close_sends_documented_telnet_logout():
     writer.wait_closed.assert_awaited_once()
     assert transport._writer is None
     assert transport._reader is None
-
-
-# --- regression: issue #8 -- a silent projector must raise a distinguishable
-# --- OptomaTimeoutError, even after async_send's one reconnect-and-retry,
-# --- so callers can tell "nothing answered" apart from a dead connection.
-
-
-def _patch_open_close(transport: OptomaTcpTransport) -> None:
-    """Make connect/disconnect instant no-ops: no real socket, no real reader.
-
-    Leaves ``transport._replies`` as a genuinely empty queue, so a command
-    send can only ever resolve by timing out -- modeling a projector that
-    accepts the TCP connection but never answers anything, the deep-standby
-    behavior reported in issue #8.
-    """
-
-    async def fake_open() -> None:
-        transport._writer = MagicMock()
-        transport._writer.is_closing.return_value = False
-        transport._writer.drain = AsyncMock()
-        transport._writer.close = MagicMock()
-        transport._writer.wait_closed = AsyncMock()
-        transport._reader = MagicMock()
-
-    async def fake_close() -> None:
-        transport._writer = None
-        transport._reader = None
-
-    transport._async_open = fake_open
-    transport._async_close = fake_close
-    # No background read loop, so nothing ever completes transport._replies.
-    transport._ensure_read_loop = lambda: None
-
-
-@pytest.mark.asyncio
-async def test_no_reply_raises_timeout_specific_error(monkeypatch):
-    # async_send disconnects and retries once on any OptomaConnectionError.
-    # A naive retry can re-wrap the second failure as the base
-    # OptomaConnectionError, losing the "just silent" signal callers rely on
-    # to avoid marking entities unavailable for a sleeping projector -- this
-    # covers the type surviving both the first failure and that retry.
-    monkeypatch.setattr("optoma_link.transport.COMMAND_TIMEOUT", 0.01)
-    transport = OptomaTcpTransport("192.0.2.1", 23)
-    _patch_open_close(transport)
-
-    with pytest.raises(OptomaTimeoutError):
-        await transport.async_send("124", "1")
-
-
-@pytest.mark.asyncio
-async def test_connect_failure_is_not_mistaken_for_a_timeout():
-    # The other half of the distinction: actually failing to reach the
-    # projector must stay a plain OptomaConnectionError, not the "it's
-    # probably just asleep" OptomaTimeoutError -- the whole point is that
-    # callers treat these two differently.
-    transport = OptomaTcpTransport("192.0.2.1", 23)
-
-    async def fake_open() -> None:
-        raise OSError("Network unreachable")
-
-    transport._async_open = fake_open
-    transport._async_close = AsyncMock()
-    transport._ensure_read_loop = lambda: None
-
-    with pytest.raises(OptomaConnectionError) as exc_info:
-        await transport.async_send("124", "1")
-    assert not isinstance(exc_info.value, OptomaTimeoutError)
 
 
 @pytest.mark.asyncio
