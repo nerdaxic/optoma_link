@@ -186,9 +186,28 @@ class OptomaUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         ``OptomaConnectionError`` (for ConfigEntryNotReady) if the projector
         is unreachable. Values the projector answers with a placeholder for
         (or rejects, e.g. in standby) are retried from the poll loop until a
-        real value arrives, then never asked for again.
+        real value arrives, then never asked for again. Skipped while the
+        projector is off, for the same reason the poll loop sends only the
+        power read then.
         """
         await self.transport.async_connect()
+        power_spec = next(
+            (
+                s
+                for s in self.profile.get("switches", [])
+                if s.get("key") == "power" and s.get("read")
+            ),
+            None,
+        )
+        if power_spec is not None:
+            try:
+                power = await self._async_read_spec("switch", power_spec)
+            except OptomaCommandError:
+                power = None
+            if power is not None:
+                self.data = {**(self.data or {}), "power": power}
+        if self._is_standby(self.data or {}):
+            return
         updates = await self._async_read_missing_device_details(dict(self.data or {}))
         if updates:
             self.data = {**(self.data or {}), **updates}
@@ -264,6 +283,10 @@ class OptomaUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return None
         return self._parse_value(entity_type, spec, raw)
 
+    @staticmethod
+    def _is_standby(data: dict[str, Any]) -> bool:
+        return data.get("power") is False
+
     async def _async_update_data(self) -> dict[str, Any]:
         data: dict[str, Any] = dict(self.data or {})
         # Contexts are registered by entities actually added to Home Assistant
@@ -278,9 +301,17 @@ class OptomaUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         any_success = False
         last_error: Exception | None = None
 
-        for entity_type, spec in self._iter_readable_entities():
+        # Power is read first, and while it reads off nothing else is sent: on
+        # a UHZ68LV the rest of the read set leaves the LAN control silent to
+        # every command (power-on included) until it is powered on by remote.
+        readable = sorted(
+            self._iter_readable_entities(), key=lambda item: item[1]["key"] != "power"
+        )
+        for entity_type, spec in readable:
             key = spec["key"]
             if key not in active_keys:
+                continue
+            if key != "power" and self._is_standby(data):
                 continue
             attempted += 1
             try:
@@ -298,14 +329,15 @@ class OptomaUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Retry any device-registry detail the projector hasn't given a real
         # value for yet (some units answer "0" until fully booted). Once every
         # detail is in, this adds zero reads to the cycle.
-        try:
-            detail_updates = await self._async_read_missing_device_details(data)
-        except OptomaConnectionError as err:
-            last_error = err
-        else:
-            if detail_updates:
-                any_success = True
-                data.update(detail_updates)
+        if not self._is_standby(data):
+            try:
+                detail_updates = await self._async_read_missing_device_details(data)
+            except OptomaConnectionError as err:
+                last_error = err
+            else:
+                if detail_updates:
+                    any_success = True
+                    data.update(detail_updates)
 
         if attempted and not any_success:
             if last_error is not None:

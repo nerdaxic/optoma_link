@@ -5,6 +5,8 @@ using values captured verbatim from its debug logs, and confirms
 non-padded replies -- what the other three profiles actually send --
 still resolve on the first, exact-match attempt.
 """
+from unittest.mock import AsyncMock
+
 import pytest
 
 from optoma_link.coordinator import OptomaUpdateCoordinator as Coordinator
@@ -179,3 +181,81 @@ async def test_first_silent_detail_still_reports_unreachable_projector():
     coordinator._async_read_spec = read_spec
     with pytest.raises(OptomaConnectionError):
         await coordinator._async_read_missing_device_details({})
+
+
+# --- standby: power-only polling (issue #8) ---------------------------------
+#
+# Captured on a UHZ68LV over LAN: in standby the power read alone is answered
+# indefinitely, but sending the rest of the poll's read set leaves the LAN
+# control silent to every command -- power-on included -- until the projector
+# is powered on by remote.
+
+
+def _standby_coordinator(power_reply: bool):
+    coordinator = object.__new__(Coordinator)
+    coordinator.profile = {
+        # Power deliberately not listed first, to pin the read ordering.
+        "switches": [
+            {"key": "av_mute", "read": ["355", "1"]},
+            {"key": "power", "read": ["124", "1"]},
+        ],
+        "selects": [{"key": "input_source", "read": ["121", "1"]}],
+        "device_info": [{"key": "firmware_version", "read": ["122", "1"]}],
+        "sensors": [],
+    }
+    coordinator.data = {}
+    coordinator._silent_device_details = set()
+    coordinator.async_contexts = lambda: {"power", "av_mute", "input_source"}
+    coordinator._apply_dynamic_interval = lambda data: None
+    coordinator.transport = AsyncMock()
+    sent = []
+
+    async def read_spec(_entity_type, spec):
+        sent.append(spec["read"][0])
+        if spec["key"] == "power":
+            return power_reply
+        return "x"
+
+    coordinator._async_read_spec = read_spec
+    return coordinator, sent
+
+
+@pytest.mark.asyncio
+async def test_poll_sends_only_power_while_off():
+    coordinator, sent = _standby_coordinator(power_reply=False)
+    data = await coordinator._async_update_data()
+    assert sent == ["124"]
+    assert data["power"] is False
+
+
+@pytest.mark.asyncio
+async def test_poll_reads_power_first_then_everything_while_on():
+    coordinator, sent = _standby_coordinator(power_reply=True)
+    await coordinator._async_update_data()
+    assert sent[0] == "124"
+    assert set(sent) == {"124", "355", "121", "122"}
+
+
+@pytest.mark.asyncio
+async def test_poll_resumes_full_read_set_once_power_reads_on():
+    # Projector was off (cached), then turned on by remote: this cycle's
+    # fresh power read must unlock the rest of the reads immediately.
+    coordinator, sent = _standby_coordinator(power_reply=True)
+    coordinator.data = {"power": False}
+    await coordinator._async_update_data()
+    assert set(sent) == {"124", "355", "121", "122"}
+
+
+@pytest.mark.asyncio
+async def test_startup_skips_device_details_while_off():
+    coordinator, sent = _standby_coordinator(power_reply=False)
+    await coordinator.async_fetch_device_details()
+    assert sent == ["124"]
+    assert coordinator.data["power"] is False
+
+
+@pytest.mark.asyncio
+async def test_startup_reads_device_details_while_on():
+    coordinator, sent = _standby_coordinator(power_reply=True)
+    await coordinator.async_fetch_device_details()
+    assert sent == ["124", "122"]
