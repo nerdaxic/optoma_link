@@ -176,6 +176,7 @@
       "name": "Power Mode (Standby)",
       "icon": "mdi:power-settings",
       "entity_category": "config",
+      "description": "EU/EMEA units: 'Communication' is accepted, but with the projector region set to EMEA the LAN and RS232-over-Telnet ports still power down in standby (EU standby-power limits), so Home Assistant cannot power the projector on. Tested and confirmed on a UHZ68LV: after changing the region from EMEA to non-EMEA in the projector's service menu, Communication holds in standby and network power-on works. To open the service menu, press Power, Up, Down, Menu on the remote or projector keypad, then change only the 'Region' setting. Changing it may affect regulatory compliance and warranty.",
       "write_code": "114",
       "options": {
         "Eco.": "0",

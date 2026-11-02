@@ -162,7 +162,7 @@ A profile is a JSON file in [`projectors/`](https://github.com/nerdaxic/optoma_l
 
 ### Entity specs
 
-Every entity has a `key` (unique within the profile), a `name`, and an optional `icon` (`mdi:` name). A `read` value is a `[code, sub_value]` pair, or `null` for write-only controls (which become assumed-state entities reflecting the last value sent).
+Every entity has a `key` (unique within the profile), a `name`, an optional `icon` (`mdi:` name), and an optional `description` (shown as a `note` attribute on the entity). A `read` value is a `[code, sub_value]` pair, or `null` for write-only controls (which become assumed-state entities reflecting the last value sent).
 
 - **switch**: `on` and `off` as `[code, value]` pairs, plus optional `read`.
 - **select**: `write_code`, `options` (`{ label: value }` sent on write), optional `read` and `read_options` (`{ raw_value: label }` for display).
