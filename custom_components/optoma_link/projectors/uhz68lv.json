@@ -170,6 +170,21 @@
         "Dynamic Black 3": ["191", "3"]
       },
       "read": null
+    },
+    {
+      "key": "power_mode",
+      "name": "Power Mode (Standby)",
+      "icon": "mdi:power-settings",
+      "entity_category": "config",
+      "write_code": "114",
+      "options": {
+        "Eco.": "0",
+        "Communication": "3"
+      },
+      "read": ["150", "16"],
+      "read_options": {
+        "0": "Eco.", "1": "Active", "2": "Communication", "3": "Communication"
+      }
     }
   ],
   "numbers": [
@@ -283,6 +298,27 @@
       "pattern": "\\d{1,2}",
       "entity_category": "diagnostic",
       "enabled_default": false
+    },
+    {
+      "key": "lan_firmware_version",
+      "name": "LAN Firmware Version",
+      "icon": "mdi:chip",
+      "read": ["357", "1"],
+      "value_type": "str",
+      "pattern": "[A-Za-z0-9.]{1,}",
+      "entity_category": "diagnostic",
+      "enabled_default": false
+    },
+    {
+      "key": "current_lamp_watt",
+      "name": "Current Lamp Watt",
+      "icon": "mdi:flash",
+      "read": ["358", "1"],
+      "value_type": "int",
+      "pattern": "\\d+",
+      "unit": "W",
+      "device_class": "power",
+      "state_class": "measurement"
     }
   ],
   "device_info": [
