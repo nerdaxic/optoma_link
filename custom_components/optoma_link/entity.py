@@ -109,3 +109,9 @@ class OptomaEntity(CoordinatorEntity[OptomaUpdateCoordinator]):
             model=profile.get("display_name", entry.title),
             name=entry.title,
         )
+
+    @property
+    def extra_state_attributes(self):
+        """Expose a profile spec's optional ``description`` as a ``note`` attribute."""
+        note = self._spec.get("description")
+        return {"note": note} if note else None
