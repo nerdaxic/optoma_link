@@ -110,6 +110,9 @@ class OptomaEntity(CoordinatorEntity[OptomaUpdateCoordinator]):
             name=entry.title,
         )
 
+    # The note is static profile text: keep it out of the recorder.
+    _unrecorded_attributes = frozenset({"note"})
+
     @property
     def extra_state_attributes(self):
         """Expose a profile spec's optional ``description`` as a ``note`` attribute."""
