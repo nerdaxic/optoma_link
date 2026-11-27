@@ -10,7 +10,7 @@
       },
       "lan": {
         "title": "Network (RS232 by Telnet) connection",
-        "description": "Before you start, set up the projector:\n\n1. Turn the projector on. It must be powered on during setup.\n2. Connect it to your network with an Ethernet cable.\n3. In the projector's menu, complete the initial network setup so it has an IP address.\n4. Enable Network > Control > Telnet, and note the port (default 23).\n5. Set Power Mode (Standby) to Active (disable Eco standby) so the projector keeps answering RS232 commands while it is powered off.\n\nThen enter the projector's network details below.",
+        "description": "Before you start, set up the projector:\n\n1. Turn the projector on. It must be powered on during setup.\n2. Connect it to your network with an Ethernet cable.\n3. In the projector's menu, complete the initial network setup so it has an IP address.\n4. Enable Network > Control > Telnet, and note the port (default 23).\n5. Set Power Mode (Standby) to Communication (not Eco) so the projector keeps answering network commands while it is powered off. On EU/EMEA units, see Known issues in the README.\n\nThen enter the projector's network details below.",
         "data": {
           "host": "Host (IP address or hostname)",
           "port": "Port",
