@@ -170,6 +170,22 @@
         "Dynamic Black 3": ["191", "3"]
       },
       "read": null
+    },
+    {
+      "key": "standby_power_mode",
+      "name": "Power Mode (Standby)",
+      "icon": "mdi:power-settings",
+      "entity_category": "config",
+      "description": "EU/EMEA units: network power-on may not work in standby. See Known issues in the README.",
+      "write_code": "114",
+      "options": {
+        "Eco.": "0",
+        "Communication": "3"
+      },
+      "read": ["150", "16"],
+      "read_options": {
+        "0": "Eco.", "2": "Communication", "3": "Communication"
+      }
     }
   ],
   "numbers": [
